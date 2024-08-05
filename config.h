@@ -16,7 +16,7 @@
 
 #include "thread.h"
 #include "log.h"
-#include "util.h"
+#include "util.h" 
 
 namespace sylar {
 
@@ -29,24 +29,24 @@ public:
     ConfigVarBase(const std::string& name, const std::string& description = "")
         :m_name(name)
         ,m_description(description) {
-        std::transform(m_name.begin(), m_name.end(), m_name.begin(), ::tolower);
+        std::transform(m_name.begin(), m_name.end(), m_name.begin(), ::tolower);  // 将m_name转换为小写形式（STL算法），存放到m_name中
     }
 
     virtual ~ConfigVarBase() {}
  
     const std::string& getName() const { return m_name;}  // 返回配置参数名称
     const std::string& getDescription() const { return m_description;}  // 返回配置参数的描述
-    virtual std::string toString() = 0;  // 转成字符串
-    virtual bool fromString(const std::string& val) = 0;  // 从字符串初始化值
-    virtual std::string getTypeName() const = 0;  // 返回配置参数值的类型名称
+    virtual std::string toString() = 0;  // 转成字符串, 纯虚函数，在派生类中实现
+    virtual bool fromString(const std::string& val) = 0;  // 从字符串初始化值, 纯虚函数，在派生类中实现
+    virtual std::string getTypeName() const = 0;  // 返回配置参数值的类型名称, 纯虚函数，在派生类中实现
 
 protected:
-    std::string m_name;  // 配置参数的名称
+    std::string m_name;  // 配置参数的名称, 大小写不敏感
     std::string m_description;  // 配置参数的描述
 };
 
 
-// 类型转换模板类(F 源类型, T 目标类型), 仿函数
+// 类型转换模板类(F 源类型, T 目标类型), 仿函数, 实现基本类型和str的转换
 template<class F, class T>
 class LexicalCast {
 public:
@@ -57,7 +57,7 @@ public:
 };
 
 
-// 类型转换模板类片特化(YAML String 转换成 std::vector<T>)
+// 类型转换模板类偏特化(YAML String 转换成 std::vector<T>)
 template<class T>
 class LexicalCast<std::string, std::vector<T> > {
 public:
@@ -67,22 +67,22 @@ public:
         std::stringstream ss;
         for(size_t i = 0; i < node.size(); ++i) {
             ss.str("");
-            ss << node[i];
-            vec.push_back(LexicalCast<std::string, T>()(ss.str()));
+            ss << node[i];  // 下面创建了一个LexicalCast类型的临时变量，然后调用重载的`()`运算符
+            vec.push_back(LexicalCast<std::string, T>()(ss.str()));  // 使用仿函数实现基本类型to string
         }
         return vec;
     }
 };
 
 
-// 类型转换模板类片特化(std::vector<T> 转换成 YAML String)
+// 类型转换模板类偏特化(std::vector<T> 转换成 YAML String)
 template<class T>
 class LexicalCast<std::vector<T>, std::string> {
 public:
     std::string operator()(const std::vector<T>& v) {
         YAML::Node node(YAML::NodeType::Sequence);
         for(auto& i : v) {
-            node.push_back(YAML::Load(LexicalCast<T, std::string>()(i)));
+            node.push_back(YAML::Load(LexicalCast<T, std::string>()(i)));  // 使用前面实现的仿函数，进行基本类型和string之间的转换
         }
         std::stringstream ss;
         ss << node;
@@ -90,7 +90,7 @@ public:
     }
 };
 
-// 类型转换模板类片特化(YAML String 转换成 std::list<T>)
+// 类型转换模板类偏特化(YAML String 转换成 std::list<T>)
 template<class T>
 class LexicalCast<std::string, std::list<T> > {
 public:
@@ -99,15 +99,15 @@ public:
         typename std::list<T> vec;
         std::stringstream ss;
         for(size_t i = 0; i < node.size(); ++i) {
-            ss.str("");
-            ss << node[i];
+            ss.str("");  // 将ss设置为空串
+            ss << node[i];  // 向ss中追加内容
             vec.push_back(LexicalCast<std::string, T>()(ss.str()));
         }
         return vec;
     }
 };
 
-// 类型转换模板类片特化(std::list<T> 转换成 YAML String)
+// 类型转换模板类偏特化(std::list<T> 转换成 YAML String)
 template<class T>
 class LexicalCast<std::list<T>, std::string> {
 public:
@@ -122,7 +122,7 @@ public:
     }
 };
 
-// 类型转换模板类片特化(YAML String 转换成 std::set<T>)
+// 类型转换模板类偏特化(YAML String 转换成 std::set<T>)
 template<class T>
 class LexicalCast<std::string, std::set<T> > {
 public:
@@ -139,7 +139,7 @@ public:
     }
 };
 
-// 类型转换模板类片特化(std::set<T> 转换成 YAML String)
+// 类型转换模板类偏特化(std::set<T> 转换成 YAML String)
 template<class T>
 class LexicalCast<std::set<T>, std::string> {
 public:
@@ -154,7 +154,7 @@ public:
     }
 };
 
-// 类型转换模板类片特化(YAML String 转换成 std::unordered_set<T>)
+// 类型转换模板类偏特化(YAML String 转换成 std::unordered_set<T>)
 template<class T>
 class LexicalCast<std::string, std::unordered_set<T> > {
 public:
@@ -171,7 +171,7 @@ public:
     }
 };
 
-// 类型转换模板类片特化(std::unordered_set<T> 转换成 YAML String)
+// 类型转换模板类偏特化(std::unordered_set<T> 转换成 YAML String)
 template<class T>
 class LexicalCast<std::unordered_set<T>, std::string> {
 public:
@@ -186,7 +186,7 @@ public:
     }
 };
 
-// 类型转换模板类片特化(YAML String 转换成 std::map<std::string, T>)
+// 类型转换模板类偏特化(YAML String 转换成 std::map<std::string, T>)
 template<class T>
 class LexicalCast<std::string, std::map<std::string, T> > {
 public:
@@ -255,27 +255,17 @@ public:
 };
 
 
-/**
- * @brief 配置参数模板子类,保存对应类型的参数值
- * @details T 参数的具体类型
- *          FromStr 从std::string转换成T类型的仿函数
- *          ToStr 从T转换成std::string的仿函数
- *          std::string 为YAML格式的字符串
- */
+// 配置参数模板子类,保存对应类型的参数值, T 参数的具体类型, std::string 为YAML格式的字符串
+// 一个参数对应一个类实例，
 template<class T, class FromStr = LexicalCast<std::string, T>
-                ,class ToStr = LexicalCast<T, std::string> >
+                ,class ToStr = LexicalCast<T, std::string> >  // 定义三个模板参数，后两个给出默认参数值
 class ConfigVar : public ConfigVarBase {
 public:
     typedef RWMutex RWMutexType;
     typedef std::shared_ptr<ConfigVar> ptr;
-    typedef std::function<void (const T& old_value, const T& new_value)> on_change_cb;
+    typedef std::function<void (const T& old_value, const T& new_value)> on_change_cb;  // 定义回调函数, 函数接受两个参数，没有返回值
 
-    /**
-     * @brief 通过参数名,参数值,描述构造ConfigVar
-     * @param[in] name 参数名称有效字符为[0-9a-z_.]
-     * @param[in] default_value 参数的默认值
-     * @param[in] description 参数的描述
-     */
+    // 通过参数名,参数值,描述构造ConfigVar, name 参数名称有效字符为[0-9a-z_.]
     ConfigVar(const std::string& name
             ,const T& default_value
             ,const std::string& description = "")
@@ -283,7 +273,7 @@ public:
         ,m_val(default_value) {
     }
  
-    // 将参数值转换成YAML String, 当转换失败抛出异常 
+    // 将参数值转换成YAML String, 当转换失败抛出异常 (override，覆盖基类中的虚函数)
     std::string toString() override {
         try {
             //return boost::lexical_cast<std::string>(m_val);
@@ -292,12 +282,12 @@ public:
         } catch (std::exception& e) {
             SYLAR_LOG_ERROR(SYLAR_LOG_ROOT()) << "ConfigVar::toString exception "
                 << e.what() << " convert: " << TypeToName<T>() << " to string"
-                << " name=" << m_name;
+                << " name=" << m_name;  // e.what(): 异常信息，TypeToName<T>(): 将对应类型名转换为str
         }
         return "";
     }
 
-    // 从YAML String 转成参数的值, 当转换失败抛出异常 
+    // 从YAML String 转成参数的值, 当转换失败抛出异常 (覆盖基类中的纯虚函数)
     bool fromString(const std::string& val) override {
         try {
             setValue(FromStr()(val));
@@ -323,20 +313,21 @@ public:
             if(v == m_val) {
                 return;
             }
+            // 遍历回调函数的容器，对每个回调函数进行调用，传入当前的m_val和v作为参数,
             for(auto& i : m_cbs) {
-                i.second(m_val, v);
+                i.second(m_val, v);  // old_value, new_value
             }
         }
         RWMutexType::WriteLock lock(m_mutex);
         m_val = v;
     }
 
-    // 返回参数值的类型名称(typeinfo)
+    // 返回参数值的类型名称(typeinfo),(覆盖基类中的纯虚函数)
     std::string getTypeName() const override { return TypeToName<T>();}
     
     // 添加变化回调函数, 返回该回调函数对应的唯一id,用于删除回调
     uint64_t addListener(on_change_cb cb) {
-        static uint64_t s_fun_id = 0;
+        static uint64_t s_fun_id = 0;  // 使用static定义，生成唯一id
         RWMutexType::WriteLock lock(m_mutex);
         ++s_fun_id;
         m_cbs[s_fun_id] = cb;
@@ -384,13 +375,15 @@ public:
      * @return 返回对应的配置参数,如果参数名存在但是类型不匹配则返回nullptr
      * @exception 如果参数名包含非法字符[^0-9a-z_.] 抛出异常 std::invalid_argument
      */
+    // 获取/创建对应参数名的配置参数
     template<class T>
     static typename ConfigVar<T>::ptr Lookup(const std::string& name,
             const T& default_value, const std::string& description = "") {
         RWMutexType::WriteLock lock(GetMutex());
         auto it = GetDatas().find(name);
+        // 如果有对应的配置项
         if(it != GetDatas().end()) {
-            auto tmp = std::dynamic_pointer_cast<ConfigVar<T> >(it->second);
+            auto tmp = std::dynamic_pointer_cast<ConfigVar<T> >(it->second);  // 将基类指针转换为派生类指针, 即ConfigVar<T>的指针
             if(tmp) {
                 SYLAR_LOG_INFO(SYLAR_LOG_ROOT()) << "Lookup name=" << name << " exists";
                 return tmp;
@@ -401,15 +394,15 @@ public:
                 return nullptr;
             }
         }
-
+        // 如果配置项的名称不符要求
         if(name.find_first_not_of("abcdefghikjlmnopqrstuvwxyz._012345678")
                 != std::string::npos) {
             SYLAR_LOG_ERROR(SYLAR_LOG_ROOT()) << "Lookup name invalid " << name;
             throw std::invalid_argument(name);
         }
-
-        typename ConfigVar<T>::ptr v(new ConfigVar<T>(name, default_value, description));
-        GetDatas()[name] = v;
+        // 创建配置项, 使用typename明确告诉编译器，这是一个类模板中的类型, ptr是ConfigVar的shared_ptr
+        typename ConfigVar<T>::ptr v(new ConfigVar<T>(name, default_value, description));  // 使用智能指针的初始化
+        GetDatas()[name] = v;  
         return v;
     }
 
@@ -437,7 +430,7 @@ public:
     static void Visit(std::function<void(ConfigVarBase::ptr)> cb);
 private:
 
-    // 返回所有的配置项 
+    // 返回所有的配置项, map, 
     static ConfigVarMap& GetDatas() {
         static ConfigVarMap s_datas;
         return s_datas;
