@@ -1,39 +1,29 @@
 #include <iostream>
-#include "log.h"
+#include <yaml-cpp/yaml.h>
+#include <boost/lexical_cast.hpp>
+#include <cppunit/TestCase.h>
+#include <mysql/mysql.h>
+#include <sstream>
+// #include "config.h"
 
 #define VERSION "1.0"
 
 using namespace std;
 
-class LogLevel {
-public: 
-    // 日志级别枚举
-    enum class Level {
-        UNKNOW = 0,
-        DEBUG = 1,
-        INFO = 2,
-        WARN = 3,
-        ERROR = 4,
-        FATAL = 5
-    };
+#include <iostream>
+#include <string>
+#include <yaml-cpp/yaml.h>
 
-        enum class Level2 {
-        UNKNOW = 1,
-        DEBUG = 2,
-        INFO = 3,
-        WARN = 4,
-        ERROR = 5,
-        FATAL = 6
-    };
-    int i ;
+using namespace std;
 
-    static const char* ToString(LogLevel::Level level);     //将日志级别转化为文本输出
-    static LogLevel::Level FromString(const std::string& str);    // 将文本转换为日志级别
-};
+int main(int argc, char* argv[]) {
+    // YAML::Node myNode;
+    // myNode["hello"] = "world";
+    // cout << myNode << endl; // That works but I want that not to stdout
 
-int main() {
-    cout << "aaa" << endl;
-    cout << __cplusplus << endl;
-    cout << "project version: " << VERSION << endl;
-    LogLevel level;
+    // string myString = "";
+    // std::stringstream ss;
+    // ss << myNode["hello"];
+    // cout << ss.str() << endl;
+    return 0;
 }

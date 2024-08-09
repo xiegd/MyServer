@@ -3,11 +3,10 @@ cmake_minimum_required(VERSION 3.10)
 project(MyServer)
 
 set(CMAKE_CXX_STANDARD 11)
-
-set(VERSION 1.0)
+set(VERSION 2.9)
 
 option(USE_OP;"is use op";OFF)
-configure_file(testheader.h testheader.h)
+configure_file(./sources/testheader.h ./sources/testheader.h)
 # set(CMAKE_CXX_STANDARD_REQUIRED true)
 
 message("extra libs: ${EXTRA_LIBS}")
@@ -32,8 +31,18 @@ list(APPEND MyList "dates")
 # 输出修改后的列表
 message("MyList after appending: ${MyList}")
 
+message("cmake module path: ${CMAKE_MODULE_PATH}")
+
+message("cmake current source dir: ${CMAKE_CURRENT_SOURCE_DIR}")
+set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR})
+message("cmake module path: ${CMAKE_MODULE_PATH}")
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
+message("cmake module path: ${CMAKE_MODULE_PATH}")
+
+
 add_executable(test test.cpp)
 
-# target_link_directories(test PUBLIC ${PROJECT_SOURCE_DIR})
-
+target_include_directories(test PUBLIC ./sources)
 target_include_directories(test PUBLIC .)
+
+# target_link_directories(test PUBLIC ${PROJECT_SOURCE_DIR})

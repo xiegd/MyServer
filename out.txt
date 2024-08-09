@@ -1,0 +1,5 @@
+/home/xie/vcpkg/buildtrees/cppunit
+/home/xie/vcpkg/buildtrees/cppunit/src/cppunit-1-60beb2c90e.clean/include/cppunit
+/home/xie/vcpkg/buildtrees/cppunit/src/cppunit-1-60beb2c90e.clean/src/cppunit
+/home/xie/vcpkg/packages/cppunit_x64-linux/share/cppunit
+/home/xie/vcpkg/ports/cppunit
