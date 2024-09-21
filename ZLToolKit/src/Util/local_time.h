@@ -11,5 +11,5 @@ void no_locks_localtime(struct tm *tmp, time_t t);
 void local_time_init();
 int get_daylight_active();
 
-} // namespace toolkit
-#endif // UTIL_LOCALTIME_H
+}  // namespace toolkit
+#endif  // UTIL_LOCALTIME_H

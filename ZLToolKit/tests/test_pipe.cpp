@@ -10,9 +10,10 @@
 
 #include <csignal>
 #include <iostream>
-#include "Util/logger.h"
+
 #include "Poller/EventPoller.h"
 #include "Poller/Pipe.h"
+#include "Util/logger.h"
 #include "Util/util.h"
 using namespace std;
 using namespace toolkit;
@@ -22,16 +23,20 @@ int main() {
     // Set up logging
     Logger::Instance().add(std::make_shared<ConsoleChannel>());
 #if defined(_WIN32)
-    ErrorL << "该测试程序不能再windows下运行，因为我不会windows下的多进程编程，但是管道模块是可以在windows下正常工作的。" << endl;
+    ErrorL << "该测试程序不能再windows下运行，因为我不会windows下的多进程编程，"
+              "但是管道模块是可以在windows下正常工作的。"
+           << endl;
 #else
     //获取父进程的PID  [AUTO-TRANSLATED:0a35f39a]
     // Get the parent process's PID
     auto parentPid = getpid();
     InfoL << "parent pid:" << parentPid << endl;
 
-    //定义一个管道，lambada类型的参数是管道收到数据的回调  [AUTO-TRANSLATED:d5eeb28a]
-    // Define a pipe, with a lambda type parameter as the callback for when data is received
-    Pipe pipe([](int size,const char *buf) {
+    //定义一个管道，lambada类型的参数是管道收到数据的回调
+    //[AUTO-TRANSLATED:d5eeb28a]
+    // Define a pipe, with a lambda type parameter as the callback for when data
+    // is received
+    Pipe pipe([](int size, const char *buf) {
         //该管道有数据可读了  [AUTO-TRANSLATED:e542256f]
         // The pipe has data available for reading
         InfoL << getpid() << " recv:" << buf;
@@ -46,10 +51,13 @@ int main() {
         // Child process
         int i = 10;
         while (i--) {
-            //在子进程每隔一秒把数据写入管道，共计发送10次  [AUTO-TRANSLATED:5a340f4b]
-            // In the child process, write data to the pipe every second, for a total of 10 times
+            //在子进程每隔一秒把数据写入管道，共计发送10次
+            //[AUTO-TRANSLATED:5a340f4b]
+            // In the child process, write data to the pipe every second, for a
+            // total of 10 times
             sleep(1);
-            string msg = StrPrinter << "message " << i << " form subprocess:" << getpid();
+            string msg = StrPrinter << "message " << i
+                                    << " form subprocess:" << getpid();
             DebugL << "子进程发送:" << msg << endl;
             pipe.send(msg.data(), msg.size());
         }
@@ -58,12 +66,12 @@ int main() {
         //父进程设置退出信号处理函数  [AUTO-TRANSLATED:b2a0b432]
         // Parent process sets up exit signal handling function
         static semaphore sem;
-        signal(SIGINT, [](int) { sem.post(); });// 设置退出信号
+        signal(SIGINT, [](int) { sem.post(); });  // 设置退出信号
         sem.wait();
 
         InfoL << "父进程退出" << endl;
     }
-#endif // defined(_WIN32)
+#endif  // defined(_WIN32)
 
     return 0;
 }

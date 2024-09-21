@@ -8,8 +8,10 @@
  * may be found in the AUTHORS file in the root of the source tree.
  */
 
-#include <assert.h>
 #include "BufferSock.h"
+
+#include <assert.h>
+
 #include "Util/logger.h"
 #include "Util/uv_errno.h"
 
@@ -20,45 +22,45 @@
 #endif
 
 #ifndef MSG_WAITFORONE
-#define MSG_WAITFORONE  0x10000
+#define MSG_WAITFORONE 0x10000
 #endif
 
 #ifndef HAVE_MMSG_HDR
 struct mmsghdr {
-        struct msghdr   msg_hdr;
-        unsigned        msg_len;
+    struct msghdr msg_hdr;
+    unsigned msg_len;
 };
 #endif
 
 #ifndef HAVE_SENDMMSG_API
-#include <unistd.h>
 #include <sys/syscall.h>
-static inline int sendmmsg(int fd, struct mmsghdr *mmsg,
-                unsigned vlen, unsigned flags)
-{
-        return syscall(__NR_sendmmsg, fd, mmsg, vlen, flags);
+#include <unistd.h>
+static inline int sendmmsg(int fd, struct mmsghdr *mmsg, unsigned vlen,
+                           unsigned flags) {
+    return syscall(__NR_sendmmsg, fd, mmsg, vlen, flags);
 }
 #endif
 
 #ifndef HAVE_RECVMMSG_API
-#include <unistd.h>
 #include <sys/syscall.h>
-static inline int recvmmsg(int fd, struct mmsghdr *mmsg,
-                unsigned vlen, unsigned flags, struct timespec *timeout)
-{
-        return syscall(__NR_recvmmsg, fd, mmsg, vlen, flags, timeout);
+#include <unistd.h>
+static inline int recvmmsg(int fd, struct mmsghdr *mmsg, unsigned vlen,
+                           unsigned flags, struct timespec *timeout) {
+    return syscall(__NR_recvmmsg, fd, mmsg, vlen, flags, timeout);
 }
 #endif
 
-#endif// defined(__linux__) || defined(__linux)
+#endif  // defined(__linux__) || defined(__linux)
 
 namespace toolkit {
 
 StatisticImp(BufferList)
 
-/////////////////////////////////////// BufferSock ///////////////////////////////////////
+    /////////////////////////////////////// BufferSock
+    //////////////////////////////////////////
 
-BufferSock::BufferSock(Buffer::Ptr buffer, struct sockaddr *addr, int addr_len) {
+    BufferSock::BufferSock(Buffer::Ptr buffer, struct sockaddr *addr,
+                           int addr_len) {
     if (addr) {
         _addr_len = addr_len ? addr_len : SockUtil::get_sock_len(addr);
         memcpy(&_addr, addr, _addr_len);
@@ -67,38 +69,31 @@ BufferSock::BufferSock(Buffer::Ptr buffer, struct sockaddr *addr, int addr_len) 
     _buffer = std::move(buffer);
 }
 
-char *BufferSock::data() const {
-    return _buffer->data();
-}
+char *BufferSock::data() const { return _buffer->data(); }
 
-size_t BufferSock::size() const {
-    return _buffer->size();
-}
+size_t BufferSock::size() const { return _buffer->size(); }
 
 const struct sockaddr *BufferSock::sockaddr() const {
     return (struct sockaddr *)&_addr;
 }
 
-socklen_t BufferSock::socklen() const {
-    return _addr_len;
-}
+socklen_t BufferSock::socklen() const { return _addr_len; }
 
-/////////////////////////////////////// BufferCallBack ///////////////////////////////////////
+/////////////////////////////////////// BufferCallBack
+//////////////////////////////////////////
 
 class BufferCallBack {
-public:
-    BufferCallBack(List<std::pair<Buffer::Ptr, bool> > list, BufferList::SendResult cb)
-        : _cb(std::move(cb))
-        , _pkt_list(std::move(list)) {}
+   public:
+    BufferCallBack(List<std::pair<Buffer::Ptr, bool>> list,
+                   BufferList::SendResult cb)
+        : _cb(std::move(cb)), _pkt_list(std::move(list)) {}
 
-    ~BufferCallBack() {
-        sendCompleted(false);
-    }
+    ~BufferCallBack() { sendCompleted(false); }
 
     void sendCompleted(bool flag) {
         if (_cb) {
             //全部发送成功或失败回调  [AUTO-TRANSLATED:6b9a9abf]
-            //All send success or failure callback
+            // All send success or failure callback
             while (!_pkt_list.empty()) {
                 _cb(_pkt_list.front().first, flag);
                 _pkt_list.pop_front();
@@ -111,18 +106,19 @@ public:
     void sendFrontSuccess() {
         if (_cb) {
             //发送成功回调  [AUTO-TRANSLATED:52759efc]
-            //Send success callback
+            // Send success callback
             _cb(_pkt_list.front().first, true);
         }
         _pkt_list.pop_front();
     }
 
-protected:
+   protected:
     BufferList::SendResult _cb;
-    List<std::pair<Buffer::Ptr, bool> > _pkt_list;
+    List<std::pair<Buffer::Ptr, bool>> _pkt_list;
 };
 
-/////////////////////////////////////// BufferSendMsg ///////////////////////////////////////
+/////////////////////////////////////// BufferSendMsg
+//////////////////////////////////////////
 #if defined(_WIN32)
 using SocketBuf = WSABUF;
 #else
@@ -130,36 +126,32 @@ using SocketBuf = iovec;
 #endif
 
 class BufferSendMsg final : public BufferList, public BufferCallBack {
-public:
+   public:
     using SocketBufVec = std::vector<SocketBuf>;
 
-    BufferSendMsg(List<std::pair<Buffer::Ptr, bool> > list, SendResult cb);
+    BufferSendMsg(List<std::pair<Buffer::Ptr, bool>> list, SendResult cb);
     ~BufferSendMsg() override = default;
 
     bool empty() override;
     size_t count() override;
     ssize_t send(int fd, int flags) override;
 
-private:
+   private:
     void reOffset(size_t n);
     ssize_t send_l(int fd, int flags);
 
-private:
+   private:
     size_t _iovec_off = 0;
     size_t _remain_size = 0;
     SocketBufVec _iovec;
 };
 
-bool BufferSendMsg::empty() {
-    return _remain_size == 0;
-}
+bool BufferSendMsg::empty() { return _remain_size == 0; }
 
-size_t BufferSendMsg::count() {
-    return _iovec.size() - _iovec_off;
-}
+size_t BufferSendMsg::count() { return _iovec.size() - _iovec_off; }
 
 ssize_t BufferSendMsg::send_l(int fd, int flags) {
-    ssize_t n;  
+    ssize_t n;
 #if !defined(_WIN32)
     do {
         struct msghdr msg;
@@ -178,15 +170,19 @@ ssize_t BufferSendMsg::send_l(int fd, int flags) {
 #else
     do {
         DWORD sent = 0;
-        n = WSASend(fd, const_cast<LPWSABUF>(&_iovec[0]), static_cast<DWORD>(_iovec.size()), &sent, static_cast<DWORD>(flags), 0, 0);
-        if (n == SOCKET_ERROR) {return -1;}
+        n = WSASend(fd, const_cast<LPWSABUF>(&_iovec[0]),
+                    static_cast<DWORD>(_iovec.size()), &sent,
+                    static_cast<DWORD>(flags), 0, 0);
+        if (n == SOCKET_ERROR) {
+            return -1;
+        }
         n = sent;
     } while (n < 0 && UV_ECANCELED == get_uv_error(true));
 #endif
 
     if (n >= (ssize_t)_remain_size) {
         //全部写完了  [AUTO-TRANSLATED:c990f48a]
-        //All written
+        // All written
         _remain_size = 0;
         sendCompleted(true);
         return n;
@@ -194,28 +190,29 @@ ssize_t BufferSendMsg::send_l(int fd, int flags) {
 
     if (n > 0) {
         //部分发送成功  [AUTO-TRANSLATED:4c240905]
-        //Partial send success
+        // Partial send success
         reOffset(n);
         return n;
     }
 
     //一个字节都未发送  [AUTO-TRANSLATED:c33c611b]
-    //Not a single byte sent
+    // Not a single byte sent
     return n;
 }
 
 ssize_t BufferSendMsg::send(int fd, int flags) {
     auto remain_size = _remain_size;
-    while (_remain_size && send_l(fd, flags) != -1);
+    while (_remain_size && send_l(fd, flags) != -1)
+        ;
 
     ssize_t sent = remain_size - _remain_size;
     if (sent > 0) {
         //部分或全部发送成功  [AUTO-TRANSLATED:a3f5e70e]
-        //Partial or all send success
+        // Partial or all send success
         return sent;
     }
     //一个字节都未发送成功  [AUTO-TRANSLATED:858b63e5]
-    //Not a single byte sent successfully
+    // Not a single byte sent successfully
     return -1;
 }
 
@@ -231,20 +228,20 @@ void BufferSendMsg::reOffset(size_t n) {
 #endif
         if (offset < n) {
             //此包发送完毕  [AUTO-TRANSLATED:759b9f0e]
-            //This package is sent
+            // This package is sent
             sendFrontSuccess();
             continue;
         }
         _iovec_off = i;
         if (offset == n) {
             //这是末尾发送完毕的一个包  [AUTO-TRANSLATED:6a3b77e4]
-            //This is the last package sent
+            // This is the last package sent
             ++_iovec_off;
             sendFrontSuccess();
             break;
         }
         //这是末尾发送部分成功的一个包  [AUTO-TRANSLATED:64645cef]
-        //This is the last package partially sent
+        // This is the last package partially sent
         size_t remain = offset - n;
 #if !defined(_WIN32)
         ref.iov_base = (char *)ref.iov_base + ref.iov_len - remain;
@@ -257,9 +254,9 @@ void BufferSendMsg::reOffset(size_t n) {
     }
 }
 
-BufferSendMsg::BufferSendMsg(List<std::pair<Buffer::Ptr, bool>> list, SendResult cb)
-    : BufferCallBack(std::move(list), std::move(cb))
-    , _iovec(_pkt_list.size()) {
+BufferSendMsg::BufferSendMsg(List<std::pair<Buffer::Ptr, bool>> list,
+                             SendResult cb)
+    : BufferCallBack(std::move(list), std::move(cb)), _iovec(_pkt_list.size()) {
     auto it = _iovec.begin();
     _pkt_list.for_each([&](std::pair<Buffer::Ptr, bool> &pr) {
 #if !defined(_WIN32)
@@ -275,32 +272,30 @@ BufferSendMsg::BufferSendMsg(List<std::pair<Buffer::Ptr, bool>> list, SendResult
     });
 }
 
-/////////////////////////////////////// BufferSendTo ///////////////////////////////////////
-class BufferSendTo final: public BufferList, public BufferCallBack {
-public:
-    BufferSendTo(List<std::pair<Buffer::Ptr, bool> > list, SendResult cb, bool is_udp);
+/////////////////////////////////////// BufferSendTo
+//////////////////////////////////////////
+class BufferSendTo final : public BufferList, public BufferCallBack {
+   public:
+    BufferSendTo(List<std::pair<Buffer::Ptr, bool>> list, SendResult cb,
+                 bool is_udp);
     ~BufferSendTo() override = default;
 
     bool empty() override;
     size_t count() override;
     ssize_t send(int fd, int flags) override;
 
-private:
+   private:
     bool _is_udp;
     size_t _offset = 0;
 };
 
-BufferSendTo::BufferSendTo(List<std::pair<Buffer::Ptr, bool>> list, BufferList::SendResult cb, bool is_udp)
-    : BufferCallBack(std::move(list), std::move(cb))
-    , _is_udp(is_udp) {}
+BufferSendTo::BufferSendTo(List<std::pair<Buffer::Ptr, bool>> list,
+                           BufferList::SendResult cb, bool is_udp)
+    : BufferCallBack(std::move(list), std::move(cb)), _is_udp(is_udp) {}
 
-bool BufferSendTo::empty() {
-    return _pkt_list.empty();
-}
+bool BufferSendTo::empty() { return _pkt_list.empty(); }
 
-size_t BufferSendTo::count() {
-    return _pkt_list.size();
-}
+size_t BufferSendTo::count() { return _pkt_list.size(); }
 
 static inline BufferSock *getBufferSockPtr(std::pair<Buffer::Ptr, bool> &pr) {
     if (!pr.second) {
@@ -317,9 +312,12 @@ ssize_t BufferSendTo::send(int fd, int flags) {
         auto &buffer = front.first;
         if (_is_udp) {
             auto ptr = getBufferSockPtr(front);
-            n = ::sendto(fd, buffer->data() + _offset, buffer->size() - _offset, flags, ptr ? ptr->sockaddr() : nullptr, ptr ? ptr->socklen() : 0);
+            n = ::sendto(fd, buffer->data() + _offset, buffer->size() - _offset,
+                         flags, ptr ? ptr->sockaddr() : nullptr,
+                         ptr ? ptr->socklen() : 0);
         } else {
-            n = ::send(fd, buffer->data() + _offset, buffer->size() - _offset, flags);
+            n = ::send(fd, buffer->data() + _offset, buffer->size() - _offset,
+                       flags);
         }
 
         if (n >= 0) {
@@ -333,50 +331,47 @@ ssize_t BufferSendTo::send(int fd, int flags) {
             continue;
         }
 
-        //n == -1的情况  [AUTO-TRANSLATED:305fb5bc]
-        //n == -1 case
+        // n == -1的情况  [AUTO-TRANSLATED:305fb5bc]
+        // n == -1 case
         if (get_uv_error(true) == UV_EINTR) {
             //被打断，需要继续发送  [AUTO-TRANSLATED:6ef0b34d]
-            //interrupted, need to continue sending
+            // interrupted, need to continue sending
             continue;
         }
         //其他原因导致的send返回-1  [AUTO-TRANSLATED:299cddb7]
-        //other reasons causing send to return -1
+        // other reasons causing send to return -1
         break;
     }
     return sent ? sent : -1;
 }
 
-/////////////////////////////////////// BufferSendMmsg ///////////////////////////////////////
+/////////////////////////////////////// BufferSendMmsg
+//////////////////////////////////////////
 
 #if defined(__linux__) || defined(__linux)
 
 class BufferSendMMsg : public BufferList, public BufferCallBack {
-public:
-    BufferSendMMsg(List<std::pair<Buffer::Ptr, bool> > list, SendResult cb);
+   public:
+    BufferSendMMsg(List<std::pair<Buffer::Ptr, bool>> list, SendResult cb);
     ~BufferSendMMsg() override = default;
 
     bool empty() override;
     size_t count() override;
     ssize_t send(int fd, int flags) override;
 
-private:
+   private:
     void reOffset(size_t n);
     ssize_t send_l(int fd, int flags);
 
-private:
+   private:
     size_t _remain_size = 0;
     std::vector<struct iovec> _iovec;
     std::vector<struct mmsghdr> _hdrvec;
 };
 
-bool BufferSendMMsg::empty() {
-    return _remain_size == 0;
-}
+bool BufferSendMMsg::empty() { return _remain_size == 0; }
 
-size_t BufferSendMMsg::count() {
-    return _hdrvec.size();
-}
+size_t BufferSendMMsg::count() { return _hdrvec.size(); }
 
 ssize_t BufferSendMMsg::send_l(int fd, int flags) {
     ssize_t n;
@@ -386,27 +381,28 @@ ssize_t BufferSendMMsg::send_l(int fd, int flags) {
 
     if (n > 0) {
         //部分或全部发送成功  [AUTO-TRANSLATED:a3f5e70e]
-        //partially or fully sent successfully
+        // partially or fully sent successfully
         reOffset(n);
         return n;
     }
 
     //一个字节都未发送  [AUTO-TRANSLATED:c33c611b]
-    //not a single byte sent
+    // not a single byte sent
     return n;
 }
 
 ssize_t BufferSendMMsg::send(int fd, int flags) {
     auto remain_size = _remain_size;
-    while (_remain_size && send_l(fd, flags) != -1);
+    while (_remain_size && send_l(fd, flags) != -1)
+        ;
     ssize_t sent = remain_size - _remain_size;
     if (sent > 0) {
         //部分或全部发送成功  [AUTO-TRANSLATED:a3f5e70e]
-        //partially or fully sent successfully
+        // partially or fully sent successfully
         return sent;
     }
     //一个字节都未发送成功  [AUTO-TRANSLATED:858b63e5]
-    //not a single byte sent successfully
+    // not a single byte sent successfully
     return -1;
 }
 
@@ -418,23 +414,24 @@ void BufferSendMMsg::reOffset(size_t n) {
         _remain_size -= hdr.msg_len;
         if (hdr.msg_len == io.iov_len) {
             //这个udp包全部发送成功  [AUTO-TRANSLATED:fce1cc86]
-            //this UDP packet sent successfully
+            // this UDP packet sent successfully
             it = _hdrvec.erase(it);
             sendFrontSuccess();
             continue;
         }
         //部分发送成功  [AUTO-TRANSLATED:4c240905]
-        //partially sent successfully
+        // partially sent successfully
         io.iov_base = (char *)io.iov_base + hdr.msg_len;
         io.iov_len -= hdr.msg_len;
         break;
     }
 }
 
-BufferSendMMsg::BufferSendMMsg(List<std::pair<Buffer::Ptr, bool>> list, SendResult cb)
-    : BufferCallBack(std::move(list), std::move(cb))
-    , _iovec(_pkt_list.size())
-    , _hdrvec(_pkt_list.size()) {
+BufferSendMMsg::BufferSendMMsg(List<std::pair<Buffer::Ptr, bool>> list,
+                               SendResult cb)
+    : BufferCallBack(std::move(list), std::move(cb)),
+      _iovec(_pkt_list.size()),
+      _hdrvec(_pkt_list.size()) {
     auto i = 0U;
     _pkt_list.for_each([&](std::pair<Buffer::Ptr, bool> &pr) {
         auto &io = _iovec[i];
@@ -457,49 +454,51 @@ BufferSendMMsg::BufferSendMMsg(List<std::pair<Buffer::Ptr, bool>> list, SendResu
     });
 }
 
-#endif //defined(__linux__) || defined(__linux)
+#endif  // defined(__linux__) || defined(__linux)
 
-
-BufferList::Ptr BufferList::create(List<std::pair<Buffer::Ptr, bool> > list, SendResult cb, bool is_udp) {
+BufferList::Ptr BufferList::create(List<std::pair<Buffer::Ptr, bool>> list,
+                                   SendResult cb, bool is_udp) {
 #if defined(_WIN32)
     if (is_udp) {
         // sendto/send 方案，待优化  [AUTO-TRANSLATED:e94184aa]
-        //sendto/send scheme, to be optimized
-        return std::make_shared<BufferSendTo>(std::move(list), std::move(cb), is_udp);
+        // sendto/send scheme, to be optimized
+        return std::make_shared<BufferSendTo>(std::move(list), std::move(cb),
+                                              is_udp);
     }
     // WSASend方案  [AUTO-TRANSLATED:9ac7bb81]
-    //WSASend scheme
+    // WSASend scheme
     return std::make_shared<BufferSendMsg>(std::move(list), std::move(cb));
 #elif defined(__linux__) || defined(__linux)
     if (is_udp) {
         // sendmmsg方案  [AUTO-TRANSLATED:4596c2c4]
-        //sendmmsg scheme
+        // sendmmsg scheme
         return std::make_shared<BufferSendMMsg>(std::move(list), std::move(cb));
     }
     // sendmsg方案  [AUTO-TRANSLATED:8846f9c4]
-    //sendmsg scheme
+    // sendmsg scheme
     return std::make_shared<BufferSendMsg>(std::move(list), std::move(cb));
 #else
     if (is_udp) {
         // sendto/send 方案, 可优化？  [AUTO-TRANSLATED:21dbae7c]
-        //sendto/send scheme, can be optimized?
-        return std::make_shared<BufferSendTo>(std::move(list), std::move(cb), is_udp);
+        // sendto/send scheme, can be optimized?
+        return std::make_shared<BufferSendTo>(std::move(list), std::move(cb),
+                                              is_udp);
     }
     // sendmsg方案  [AUTO-TRANSLATED:8846f9c4]
-    //sendmsg scheme
+    // sendmsg scheme
     return std::make_shared<BufferSendMsg>(std::move(list), std::move(cb));
 #endif
 }
 
 #if defined(__linux) || defined(__linux__)
 class SocketRecvmmsgBuffer : public SocketRecvBuffer {
-public:
+   public:
     SocketRecvmmsgBuffer(size_t count, size_t size)
-        : _size(size)
-        , _iovec(count)
-        , _mmsgs(count)
-        , _buffers(count)
-        , _address(count) {
+        : _size(size),
+          _iovec(count),
+          _mmsgs(count),
+          _buffers(count),
+          _address(count) {
         for (auto i = 0u; i < count; ++i) {
             auto buf = BufferRaw::create();
             buf->setCapacity(size);
@@ -555,11 +554,13 @@ public:
 
     Buffer::Ptr &getBuffer(size_t index) override { return _buffers[index]; }
 
-    struct sockaddr_storage &getAddress(size_t index) override { return _address[index]; }
+    struct sockaddr_storage &getAddress(size_t index) override {
+        return _address[index];
+    }
 
-private:
+   private:
     size_t _size;
-    ssize_t _last_count { 0 };
+    ssize_t _last_count{0};
     std::vector<struct iovec> _iovec;
     std::vector<struct mmsghdr> _mmsgs;
     std::vector<Buffer::Ptr> _buffers;
@@ -568,9 +569,9 @@ private:
 #endif
 
 class SocketRecvFromBuffer : public SocketRecvBuffer {
-public:
-    SocketRecvFromBuffer(size_t size): _size(size) {}
-    
+   public:
+    SocketRecvFromBuffer(size_t size) : _size(size) {}
+
     ssize_t recvFromSocket(int fd, ssize_t &count) override {
         ssize_t nread;
         socklen_t len = sizeof(_address);
@@ -579,7 +580,8 @@ public:
         }
 
         do {
-            nread = recvfrom(fd, _buffer->data(), _buffer->getCapacity() - 1, 0, (struct sockaddr *)&_address, &len);
+            nread = recvfrom(fd, _buffer->data(), _buffer->getCapacity() - 1, 0,
+                             (struct sockaddr *)&_address, &len);
         } while (-1 == nread && UV_EINTR == get_uv_error(true));
 
         if (nread > 0) {
@@ -592,16 +594,18 @@ public:
 
     Buffer::Ptr &getBuffer(size_t index) override { return _buffer; }
 
-    struct sockaddr_storage &getAddress(size_t index) override { return _address; }
+    struct sockaddr_storage &getAddress(size_t index) override {
+        return _address;
+    }
 
-private:
+   private:
     void allocBuffer() {
         auto buf = BufferRaw::create();
         buf->setCapacity(_size);
         _buffer = std::move(buf);
     }
 
-private:
+   private:
     size_t _size;
     Buffer::Ptr _buffer;
     struct sockaddr_storage _address;
@@ -613,10 +617,12 @@ static constexpr auto kBufferCapacity = 4 * 1024u;
 SocketRecvBuffer::Ptr SocketRecvBuffer::create(bool is_udp) {
 #if defined(__linux) || defined(__linux__)
     if (is_udp) {
-        return std::make_shared<SocketRecvmmsgBuffer>(kPacketCount, kBufferCapacity);
+        return std::make_shared<SocketRecvmmsgBuffer>(kPacketCount,
+                                                      kBufferCapacity);
     }
 #endif
-    return std::make_shared<SocketRecvFromBuffer>(kPacketCount * kBufferCapacity);
+    return std::make_shared<SocketRecvFromBuffer>(kPacketCount *
+                                                  kBufferCapacity);
 }
 
-} //toolkit
+}  // namespace toolkit

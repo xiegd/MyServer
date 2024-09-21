@@ -12,13 +12,14 @@
 #define Pipe_h
 
 #include <functional>
-#include "PipeWrap.h"
+
 #include "EventPoller.h"
+#include "PipeWrap.h"
 
 namespace toolkit {
 
 class Pipe {
-public:
+   public:
     using onRead = std::function<void(int size, const char *buf)>;
 
     Pipe(const onRead &cb = nullptr, const EventPoller::Ptr &poller = nullptr);
@@ -26,7 +27,7 @@ public:
 
     void send(const char *send, int size = 0);
 
-private:
+   private:
     std::shared_ptr<PipeWrap> _pipe;
     EventPoller::Ptr _poller;
 };

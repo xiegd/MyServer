@@ -16,7 +16,7 @@
 namespace toolkit {
 
 class FdSet {
-public:
+   public:
     FdSet();
     ~FdSet();
     void fdZero();
@@ -26,7 +26,8 @@ public:
     void *_ptr;
 };
 
-int zl_select(int cnt, FdSet *read, FdSet *write, FdSet *err, struct timeval *tv);
+int zl_select(int cnt, FdSet *read, FdSet *write, FdSet *err,
+              struct timeval *tv);
 
 } /* namespace toolkit */
 #endif /* SRC_POLLER_SELECTWRAP_H_ */

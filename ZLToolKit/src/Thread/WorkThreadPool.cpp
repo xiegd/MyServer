@@ -27,17 +27,15 @@ EventPoller::Ptr WorkThreadPool::getPoller() {
 
 WorkThreadPool::WorkThreadPool() {
     //最低优先级  [AUTO-TRANSLATED:cd1f0dbc]
-    //Lowest priority
-    addPoller("work poller", s_pool_size, ThreadPool::PRIORITY_LOWEST, false, s_enable_cpu_affinity);
+    // Lowest priority
+    addPoller("work poller", s_pool_size, ThreadPool::PRIORITY_LOWEST, false,
+              s_enable_cpu_affinity);
 }
 
-void WorkThreadPool::setPoolSize(size_t size) {
-    s_pool_size = size;
-}
+void WorkThreadPool::setPoolSize(size_t size) { s_pool_size = size; }
 
 void WorkThreadPool::enableCpuAffinity(bool enable) {
     s_enable_cpu_affinity = enable;
 }
 
 } /* namespace toolkit */
-

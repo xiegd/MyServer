@@ -8,17 +8,17 @@
  * may be found in the AUTHORS file in the root of the source tree.
  */
 
-#include <cstdlib>
 #include "Buffer.h"
+
+#include <cstdlib>
+
 #include "Util/onceToken.h"
 
 namespace toolkit {
 
-StatisticImp(Buffer)
-StatisticImp(BufferRaw)
-StatisticImp(BufferLikeString)
+StatisticImp(Buffer) StatisticImp(BufferRaw) StatisticImp(BufferLikeString)
 
-BufferRaw::Ptr BufferRaw::create() {
+    BufferRaw::Ptr BufferRaw::create() {
 #if 0
     static ResourcePool<BufferRaw> packet_pool;
     static onceToken token([]() {
@@ -32,4 +32,4 @@ BufferRaw::Ptr BufferRaw::create() {
 #endif
 }
 
-}//namespace toolkit
+}  // namespace toolkit

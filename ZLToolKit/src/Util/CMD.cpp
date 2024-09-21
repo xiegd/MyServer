@@ -9,20 +9,21 @@
  */
 
 #include "CMD.h"
+
 #include "onceToken.h"
 
 #if defined(_WIN32)
 #include "win32/getopt.h"
 #else
 #include <getopt.h>
-#endif // defined(_WIN32)
+#endif  // defined(_WIN32)
 
 using namespace std;
 
 namespace toolkit {
 
 //默认注册exit/quit/help/clear命令  [AUTO-TRANSLATED:1411f05e]
-//Default registration of exit/quit/help/clear commands
+// Default registration of exit/quit/help/clear commands
 static onceToken s_token([]() {
     REGIST_CMD(exit)
     REGIST_CMD(quit)
@@ -35,28 +36,34 @@ CMDRegister &CMDRegister::Instance() {
     return instance;
 }
 
-void OptionParser::operator()(mINI &all_args, int argc, char *argv[], const std::shared_ptr<ostream> &stream) {
+void OptionParser::operator()(mINI &all_args, int argc, char *argv[],
+                              const std::shared_ptr<ostream> &stream) {
     vector<struct option> vec_long_opt;
     string str_short_opt;
     do {
         struct option tmp;
         for (auto &pr : _map_options) {
             auto &opt = pr.second;
-            //long opt
-            tmp.name = (char *) opt._long_opt.data();
+            // long opt
+            tmp.name = (char *)opt._long_opt.data();
             tmp.has_arg = opt._type;
             tmp.flag = nullptr;
             tmp.val = pr.first;
             vec_long_opt.emplace_back(tmp);
-            //short opt
+            // short opt
             if (!opt._short_opt) {
                 continue;
             }
             str_short_opt.push_back(opt._short_opt);
             switch (opt._type) {
-                case Option::ArgRequired: str_short_opt.append(":"); break;
-                case Option::ArgOptional: str_short_opt.append("::"); break;
-                default: break;
+                case Option::ArgRequired:
+                    str_short_opt.append(":");
+                    break;
+                case Option::ArgOptional:
+                    str_short_opt.append("::");
+                    break;
+                default:
+                    break;
             }
         }
         tmp.flag = 0;
@@ -72,12 +79,13 @@ void OptionParser::operator()(mINI &all_args, int argc, char *argv[], const std:
     int index;
     optind = 0;
     opterr = 0;
-    while ((index = getopt_long(argc, argv, &str_short_opt[0], &vec_long_opt[0], nullptr)) != -1) {
+    while ((index = getopt_long(argc, argv, &str_short_opt[0], &vec_long_opt[0],
+                                nullptr)) != -1) {
         stringstream ss;
         ss << "  未识别的选项,输入\"-h\"获取帮助.";
         if (index < 0xFF) {
             //短参数  [AUTO-TRANSLATED:87b4c1df]
-            //Short parameters
+            // Short parameters
             auto it = _map_char_index.find(index);
             if (it == _map_char_index.end()) {
                 throw std::invalid_argument(ss.str());
@@ -97,9 +105,10 @@ void OptionParser::operator()(mINI &all_args, int argc, char *argv[], const std:
         optarg = nullptr;
     }
     for (auto &pr : _map_options) {
-        if (pr.second._default_value && all_args.find(pr.second._long_opt) == all_args.end()) {
+        if (pr.second._default_value &&
+            all_args.find(pr.second._long_opt) == all_args.end()) {
             //有默认值,赋值默认值  [AUTO-TRANSLATED:9a82f49c]
-            //Has default value, assigns default value
+            // Has default value, assigns default value
             all_args.emplace(pr.second._long_opt, *pr.second._default_value);
         }
     }
@@ -107,7 +116,8 @@ void OptionParser::operator()(mINI &all_args, int argc, char *argv[], const std:
         if (pr.second._must_exist) {
             if (all_args.find(pr.second._long_opt) == all_args.end()) {
                 stringstream ss;
-                ss << "  参数\"" << pr.second._long_opt << "\"必须提供,输入\"-h\"选项获取帮助";
+                ss << "  参数\"" << pr.second._long_opt
+                   << "\"必须提供,输入\"-h\"选项获取帮助";
                 throw std::invalid_argument(ss.str());
             }
         }
@@ -121,4 +131,4 @@ void OptionParser::operator()(mINI &all_args, int argc, char *argv[], const std:
     }
 }
 
-}//namespace toolkit
+}  // namespace toolkit

@@ -12,20 +12,21 @@
 #define ZLTOOLKIT_BUFFERSOCK_H
 
 #if !defined(_WIN32)
-#include <sys/uio.h>
 #include <limits.h>
+#include <sys/uio.h>
 #endif
 #include <cassert>
+#include <functional>
 #include <memory>
 #include <string>
-#include <vector>
 #include <type_traits>
-#include <functional>
-#include "Util/util.h"
+#include <vector>
+
+#include "Buffer.h"
 #include "Util/List.h"
 #include "Util/ResourcePool.h"
+#include "Util/util.h"
 #include "sockutil.h"
-#include "Buffer.h"
 
 namespace toolkit {
 
@@ -34,26 +35,28 @@ namespace toolkit {
 #endif
 
 class BufferSock : public Buffer {
-public:
+   public:
     using Ptr = std::shared_ptr<BufferSock>;
-    BufferSock(Buffer::Ptr ptr, struct sockaddr *addr = nullptr, int addr_len = 0);
+    BufferSock(Buffer::Ptr ptr, struct sockaddr *addr = nullptr,
+               int addr_len = 0);
     ~BufferSock() override = default;
 
     char *data() const override;
     size_t size() const override;
     const struct sockaddr *sockaddr() const;
-    socklen_t  socklen() const;
+    socklen_t socklen() const;
 
-private:
+   private:
     int _addr_len = 0;
     struct sockaddr_storage _addr;
     Buffer::Ptr _buffer;
 };
 
 class BufferList : public noncopyable {
-public:
+   public:
     using Ptr = std::shared_ptr<BufferList>;
-    using SendResult = std::function<void(const Buffer::Ptr &buffer, bool send_success)>;
+    using SendResult =
+        std::function<void(const Buffer::Ptr &buffer, bool send_success)>;
 
     BufferList() = default;
     virtual ~BufferList() = default;
@@ -62,16 +65,17 @@ public:
     virtual size_t count() = 0;
     virtual ssize_t send(int fd, int flags) = 0;
 
-    static Ptr create(List<std::pair<Buffer::Ptr, bool> > list, SendResult cb, bool is_udp);
+    static Ptr create(List<std::pair<Buffer::Ptr, bool> > list, SendResult cb,
+                      bool is_udp);
 
-private:
+   private:
     //对象个数统计  [AUTO-TRANSLATED:3b43e8c2]
-    //Object count statistics
+    // Object count statistics
     ObjectStatistic<BufferList> _statistic;
 };
 
 class SocketRecvBuffer {
-public:
+   public:
     using Ptr = std::shared_ptr<SocketRecvBuffer>;
 
     virtual ~SocketRecvBuffer() = default;
@@ -83,5 +87,5 @@ public:
     static Ptr create(bool is_udp);
 };
 
-}
-#endif //ZLTOOLKIT_BUFFERSOCK_H
+}  // namespace toolkit
+#endif  // ZLTOOLKIT_BUFFERSOCK_H

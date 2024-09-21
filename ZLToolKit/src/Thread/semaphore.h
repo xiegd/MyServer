@@ -25,17 +25,17 @@
  #include <semaphore.h>
  #define HAVE_SEM
  #endif //HAVE_SEM
- 
+
  * [AUTO-TRANSLATED:8823f395]
 */
 
-#include <mutex>
 #include <condition_variable>
+#include <mutex>
 
 namespace toolkit {
 
 class semaphore {
-public:
+   public:
     explicit semaphore(size_t initial = 0) {
 #if defined(HAVE_SEM)
         sem_init(&_sem, 0, initial);
@@ -78,7 +78,7 @@ public:
 #endif
     }
 
-private:
+   private:
 #if defined(HAVE_SEM)
     sem_t _sem;
 #else

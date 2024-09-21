@@ -51,8 +51,7 @@ char *av_base64_encode(char *out, int out_size, const uint8_t *in, int in_size);
 /**
  * Calculate the output size needed to base64-encode x bytes.
  */
-#define AV_BASE64_SIZE(x)  (((x)+2) / 3 * 4 + 1)
-
+#define AV_BASE64_SIZE(x) (((x) + 2) / 3 * 4 + 1)
 
 /**
  * 编码base64
@@ -61,7 +60,7 @@ char *av_base64_encode(char *out, int out_size, const uint8_t *in, int in_size);
  * Encode base64
  * @param txt plaintext
  * @return ciphertext
- 
+
  * [AUTO-TRANSLATED:72045f2c]
  */
 std::string encodeBase64(const std::string &txt);
@@ -73,7 +72,7 @@ std::string encodeBase64(const std::string &txt);
  * Decode base64
  * @param txt ciphertext
  * @return plaintext
- 
+
  * [AUTO-TRANSLATED:115e667b]
  */
 std::string decodeBase64(const std::string &txt);

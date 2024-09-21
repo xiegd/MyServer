@@ -8,8 +8,9 @@
  * may be found in the AUTHORS file in the root of the source tree.
  */
 
-#include <atomic>
 #include "Session.h"
+
+#include <atomic>
 
 using namespace std;
 
@@ -18,10 +19,10 @@ namespace toolkit {
 class TcpSession : public Session {};
 class UdpSession : public Session {};
 
-StatisticImp(UdpSession)
-StatisticImp(TcpSession)
+StatisticImp(UdpSession) StatisticImp(TcpSession)
 
-Session::Session(const Socket::Ptr &sock) : SocketHelper(sock) {
+    Session::Session(const Socket::Ptr &sock)
+    : SocketHelper(sock) {
     if (sock->sockType() == SockNum::Sock_TCP) {
         _statistic_tcp.reset(new ObjectStatistic<TcpSession>);
     } else {
@@ -32,9 +33,10 @@ Session::Session(const Socket::Ptr &sock) : SocketHelper(sock) {
 string Session::getIdentifier() const {
     if (_id.empty()) {
         static atomic<uint64_t> s_session_index{0};
-        _id = to_string(++s_session_index) + '-' + to_string(getSock()->rawFD());
+        _id =
+            to_string(++s_session_index) + '-' + to_string(getSock()->rawFD());
     }
     return _id;
 }
 
-} // namespace toolkit
+}  // namespace toolkit

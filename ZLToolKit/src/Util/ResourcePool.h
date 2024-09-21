@@ -11,7 +11,6 @@
 #ifndef UTIL_RECYCLEPOOL_H_
 #define UTIL_RECYCLEPOOL_H_
 
-#include "List.h"
 #include <atomic>
 #include <deque>
 #include <functional>
@@ -19,10 +18,13 @@
 #include <mutex>
 #include <unordered_set>
 
+#include "List.h"
+
 namespace toolkit {
 
-#if (defined(__GNUC__) && (__GNUC__ >= 5 || (__GNUC__ >= 4 && __GNUC_MINOR__ >= 9))) || defined(__clang__)             \
-    || !defined(__GNUC__)
+#if (defined(__GNUC__) &&                                          \
+     (__GNUC__ >= 5 || (__GNUC__ >= 4 && __GNUC_MINOR__ >= 9))) || \
+    defined(__clang__) || !defined(__GNUC__)
 #define SUPPORT_DYNAMIC_TEMPLATE
 #endif
 
@@ -33,7 +35,7 @@ class ResourcePool;
 
 template <typename C>
 class shared_ptr_imp : public std::shared_ptr<C> {
-public:
+   public:
     shared_ptr_imp() {}
 
     /**
@@ -45,19 +47,19 @@ public:
      * @param ptr Raw pointer
      * @param weakPool Circular pool managing this pointer
      * @param quit Whether to give up circular reuse
-     
+
      * [AUTO-TRANSLATED:5af6d6a5]
      */
-    shared_ptr_imp(
-        C *ptr, const std::weak_ptr<ResourcePool_l<C>> &weakPool, std::shared_ptr<std::atomic_bool> quit,
-        const std::function<void(C *)> &on_recycle);
+    shared_ptr_imp(C *ptr, const std::weak_ptr<ResourcePool_l<C>> &weakPool,
+                   std::shared_ptr<std::atomic_bool> quit,
+                   const std::function<void(C *)> &on_recycle);
 
     /**
      * 放弃或恢复回到循环池继续使用
      * @param flag
      * Abandon or recover to continue using in the circular pool
      * @param flag
-     
+
      * [AUTO-TRANSLATED:eda3e499]
      */
     void quit(bool flag = true) {
@@ -66,13 +68,13 @@ public:
         }
     }
 
-private:
+   private:
     std::shared_ptr<std::atomic_bool> _quit;
 };
 
 template <typename C>
 class ResourcePool_l : public std::enable_shared_from_this<ResourcePool_l<C>> {
-public:
+   public:
     using ValuePtr = shared_ptr_imp<C>;
     friend class shared_ptr_imp<C>;
     friend class ResourcePool<C>;
@@ -86,7 +88,7 @@ public:
     ResourcePool_l(ArgTypes &&...args) {
         _alloc = [args...]() -> C * { return new C(args...); };
     }
-#endif // defined(SUPPORT_DYNAMIC_TEMPLATE)
+#endif  // defined(SUPPORT_DYNAMIC_TEMPLATE)
 
     ~ResourcePool_l() {
         for (auto ptr : _objs) {
@@ -100,7 +102,8 @@ public:
     }
 
     ValuePtr obtain(const std::function<void(C *)> &on_recycle = nullptr) {
-        return ValuePtr(getPtr(), _weak_self, std::make_shared<std::atomic_bool>(false), on_recycle);
+        return ValuePtr(getPtr(), _weak_self,
+                        std::make_shared<std::atomic_bool>(false), on_recycle);
     }
 
     std::shared_ptr<C> obtain2() {
@@ -109,7 +112,7 @@ public:
             auto strongPool = weak_self.lock();
             if (strongPool) {
                 //放入循环池  [AUTO-TRANSLATED:5ec73a78]
-                //Put into circular pool
+                // Put into circular pool
                 strongPool->recycle(ptr);
             } else {
                 delete ptr;
@@ -117,12 +120,12 @@ public:
         });
     }
 
-private:
+   private:
     void recycle(C *obj) {
         auto is_busy = _busy.test_and_set();
         if (!is_busy) {
             //获取到锁  [AUTO-TRANSLATED:6eb7c6e9]
-            //Acquired lock
+            // Acquired lock
             if (_objs.size() >= _pool_size) {
                 delete obj;
             } else {
@@ -131,7 +134,7 @@ private:
             _busy.clear();
         } else {
             //未获取到锁  [AUTO-TRANSLATED:2b5e8adb]
-            //Failed to acquire lock
+            // Failed to acquire lock
             delete obj;
         }
     }
@@ -141,7 +144,7 @@ private:
         auto is_busy = _busy.test_and_set();
         if (!is_busy) {
             //获取到锁  [AUTO-TRANSLATED:6eb7c6e9]
-            //Acquired lock
+            // Acquired lock
             if (_objs.size() == 0) {
                 ptr = _alloc();
             } else {
@@ -151,7 +154,7 @@ private:
             _busy.clear();
         } else {
             //未获取到锁  [AUTO-TRANSLATED:2b5e8adb]
-            //Failed to acquire lock
+            // Failed to acquire lock
             ptr = _alloc();
         }
         return ptr;
@@ -159,25 +162,26 @@ private:
 
     void setup() { _weak_self = this->shared_from_this(); }
 
-private:
+   private:
     size_t _pool_size = 8;
     std::vector<C *> _objs;
     std::function<C *(void)> _alloc;
-    std::atomic_flag _busy { false };
+    std::atomic_flag _busy{false};
     std::weak_ptr<ResourcePool_l> _weak_self;
 };
 
 /**
  * 循环池，注意，循环池里面的对象不能继承enable_shared_from_this！
  * @tparam C
- * Circular pool, note that objects in the circular pool cannot inherit from enable_shared_from_this!
+ * Circular pool, note that objects in the circular pool cannot inherit from
+ enable_shared_from_this!
  * @tparam C
- 
+
  * [AUTO-TRANSLATED:e08caac8]
  */
 template <typename C>
 class ResourcePool {
-public:
+   public:
     using ValuePtr = shared_ptr_imp<C>;
     ResourcePool() {
         pool.reset(new ResourcePool_l<C>());
@@ -186,42 +190,49 @@ public:
 #if defined(SUPPORT_DYNAMIC_TEMPLATE)
     template <typename... ArgTypes>
     ResourcePool(ArgTypes &&...args) {
-        pool = std::make_shared<ResourcePool_l<C>>(std::forward<ArgTypes>(args)...);
+        pool = std::make_shared<ResourcePool_l<C>>(
+            std::forward<ArgTypes>(args)...);
         pool->setup();
     }
-#endif // defined(SUPPORT_DYNAMIC_TEMPLATE)
+#endif  // defined(SUPPORT_DYNAMIC_TEMPLATE)
     void setSize(size_t size) { pool->setSize(size); }
 
     //获取一个对象，性能差些，但是功能丰富些  [AUTO-TRANSLATED:88b9a207]
-    //Get an object, performance is slightly worse, but with more features
-    ValuePtr obtain(const std::function<void(C *)> &on_recycle = nullptr) { return pool->obtain(on_recycle); }
+    // Get an object, performance is slightly worse, but with more features
+    ValuePtr obtain(const std::function<void(C *)> &on_recycle = nullptr) {
+        return pool->obtain(on_recycle);
+    }
 
     //获取一个对象，性能好些  [AUTO-TRANSLATED:0032c7ca]
-    //Get an object, performance is slightly better
+    // Get an object, performance is slightly better
     std::shared_ptr<C> obtain2() { return pool->obtain2(); }
 
-private:
+   private:
     std::shared_ptr<ResourcePool_l<C>> pool;
 };
 
-template<typename C>
-shared_ptr_imp<C>::shared_ptr_imp(C *ptr,
-                                  const std::weak_ptr<ResourcePool_l<C> > &weakPool,
-                                  std::shared_ptr<std::atomic_bool> quit,
-                                  const std::function<void(C *)> &on_recycle) :
-    std::shared_ptr<C>(ptr, [weakPool, quit, on_recycle](C *ptr) {
-            if (on_recycle) {
-                on_recycle(ptr);
-            }
-            auto strongPool = weakPool.lock();
-            if (strongPool && !(*quit)) {
-                //循环池还在并且不放弃放入循环池  [AUTO-TRANSLATED:96e856da]
-                //Loop pool is still in and does not give up putting into loop pool
-                strongPool->recycle(ptr);
-            } else {
-                delete ptr;
-            }
-        }), _quit(std::move(quit)) {}
+template <typename C>
+shared_ptr_imp<C>::shared_ptr_imp(
+    C *ptr, const std::weak_ptr<ResourcePool_l<C>> &weakPool,
+    std::shared_ptr<std::atomic_bool> quit,
+    const std::function<void(C *)> &on_recycle)
+    : std::shared_ptr<C>(ptr,
+                         [weakPool, quit, on_recycle](C *ptr) {
+                             if (on_recycle) {
+                                 on_recycle(ptr);
+                             }
+                             auto strongPool = weakPool.lock();
+                             if (strongPool && !(*quit)) {
+                                 //循环池还在并且不放弃放入循环池
+                                 //[AUTO-TRANSLATED:96e856da] Loop pool is still
+                                 // in and does not give up putting into loop
+                                 // pool
+                                 strongPool->recycle(ptr);
+                             } else {
+                                 delete ptr;
+                             }
+                         }),
+      _quit(std::move(quit)) {}
 
 } /* namespace toolkit */
 #endif /* UTIL_RECYCLEPOOL_H_ */

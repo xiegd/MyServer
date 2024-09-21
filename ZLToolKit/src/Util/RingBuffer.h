@@ -12,18 +12,20 @@
 #define UTIL_RINGBUFFER_H_
 
 #include <assert.h>
+
 #include <atomic>
+#include <condition_variable>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <unordered_map>
-#include <condition_variable>
-#include <functional>
-#include "util.h"
+
 #include "List.h"
 #include "Poller/EventPoller.h"
+#include "util.h"
 
 // GOP缓存最大长度下限值  [AUTO-TRANSLATED:63162058]
-//GOP cache minimum length lower bound value
+// GOP cache minimum length lower bound value
 #define RING_MIN_SIZE 32
 #define LOCK_GUARD(mtx) std::lock_guard<decltype(mtx)> lck(mtx)
 
@@ -31,7 +33,7 @@ namespace toolkit {
 
 template <typename T>
 class RingDelegate {
-public:
+   public:
     using Ptr = std::shared_ptr<RingDelegate>;
     RingDelegate() = default;
     virtual ~RingDelegate() = default;
@@ -50,15 +52,16 @@ class _RingReaderDispatcher;
  * 所以把锁去掉了
  * 对该对象的一切操作都应该在poller线程中执行
  * Circular cache reader
- * All events triggered by this object will be executed in the bound poller thread
+ * All events triggered by this object will be executed in the bound poller
+ thread
  * So the lock is removed
  * All operations on this object should be executed in the poller thread
- 
+
  * [AUTO-TRANSLATED:3d0f773d]
  */
 template <typename T>
 class _RingReader {
-public:
+   public:
     using Ptr = std::shared_ptr<_RingReader>;
     friend class _RingReaderDispatcher<T>;
 
@@ -97,18 +100,21 @@ public:
         if (!_storage) {
             return;
         }
-        _storage->getCache().for_each([this](const List<std::pair<bool, T>> &lst) {
-            lst.for_each([this](const std::pair<bool, T> &pr) { onRead(pr.second, pr.first); });
-        });
+        _storage->getCache().for_each(
+            [this](const List<std::pair<bool, T>> &lst) {
+                lst.for_each([this](const std::pair<bool, T> &pr) {
+                    onRead(pr.second, pr.first);
+                });
+            });
     }
 
-private:
+   private:
     void onRead(const T &data, bool /*is_key*/) { _read_cb(data); }
     void onMessage(const Any &data) { _msg_cb(data); }
     void onDetach() const { _detach_cb(); }
     Any getInfo() { return _info_cb(); }
 
-private:
+   private:
     std::shared_ptr<_RingStorage<T>> _storage;
     std::function<void(void)> _detach_cb;
     std::function<void(const T &)> _read_cb;
@@ -118,12 +124,12 @@ private:
 
 template <typename T>
 class _RingStorage {
-public:
+   public:
     using Ptr = std::shared_ptr<_RingStorage>;
     using GopType = List<List<std::pair<bool, T>>>;
     _RingStorage(size_t max_size, size_t max_gop_size) {
         // gop缓存个数不能小于32  [AUTO-TRANSLATED:63d52404]
-        //The number of GOP caches cannot be less than 32
+        // The number of GOP caches cannot be less than 32
         if (max_size < RING_MIN_SIZE) {
             max_size = RING_MIN_SIZE;
         }
@@ -143,7 +149,7 @@ public:
      * @param in Data
      * @param is_key Whether it is a key frame
      * @return Whether to trigger a reset of the circular cache size
-     
+
      * [AUTO-TRANSLATED:8ccedd1d]
      */
     void write(T in, bool is_key = true) {
@@ -152,33 +158,35 @@ public:
             _started = true;
             if (!_data_cache.back().empty()) {
                 //当前gop列队还没收到任意缓存  [AUTO-TRANSLATED:81e257d0]
-                //The current GOP queue has not received any cache
+                // The current GOP queue has not received any cache
                 _data_cache.emplace_back();
             }
             if (_data_cache.size() > _max_gop_size) {
-                // GOP个数超过限制，那么移除最早的GOP  [AUTO-TRANSLATED:054ad5e4]
-                //The number of GOPs exceeds the limit, so remove the earliest GOP
+                // GOP个数超过限制，那么移除最早的GOP [AUTO-TRANSLATED:054ad5e4]
+                // The number of GOPs exceeds the limit, so remove the earliest
+                // GOP
                 popFrontGop();
             }
         }
 
         if (!_have_idr && _started) {
             //缓存中没有关键帧，那么gop缓存无效  [AUTO-TRANSLATED:394a9170]
-            //There is no key frame in the cache, so the GOP cache is invalid
+            // There is no key frame in the cache, so the GOP cache is invalid
             return;
         }
         _data_cache.back().emplace_back(std::make_pair(is_key, std::move(in)));
         if (++_size > _max_size) {
             // GOP缓存溢出  [AUTO-TRANSLATED:1cd0ddc4]
-            //GOP cache overflow
+            // GOP cache overflow
             while (_data_cache.size() > 1) {
                 //先尝试清除老的GOP缓存  [AUTO-TRANSLATED:a01422a1]
-                //Try to clear the old GOP cache first
+                // Try to clear the old GOP cache first
                 popFrontGop();
             }
             if (_size > _max_size) {
-                //还是大于最大缓冲限制，那么清空所有GOP  [AUTO-TRANSLATED:dec7aa9b]
-                //Still greater than the maximum buffer limit, so clear all GOPs
+                //还是大于最大缓冲限制，那么清空所有GOP
+                //[AUTO-TRANSLATED:dec7aa9b] Still greater than the maximum
+                // buffer limit, so clear all GOPs
                 clearCache();
             }
         }
@@ -204,7 +212,7 @@ public:
         _data_cache.emplace_back();
     }
 
-private:
+   private:
     _RingStorage() = default;
 
     void popFrontGop() {
@@ -217,7 +225,7 @@ private:
         }
     }
 
-private:
+   private:
     bool _started = false;
     bool _have_idr;
     size_t _size;
@@ -234,12 +242,13 @@ class RingBuffer;
  * @tparam T
  * Ring buffer event dispatcher, can only be operated by one poller thread
  * @tparam T
- 
+
  * [AUTO-TRANSLATED:6c0d8449]
  */
 template <typename T>
-class _RingReaderDispatcher : public std::enable_shared_from_this<_RingReaderDispatcher<T>> {
-public:
+class _RingReaderDispatcher
+    : public std::enable_shared_from_this<_RingReaderDispatcher<T>> {
+   public:
     using Ptr = std::shared_ptr<_RingReaderDispatcher>;
     using RingReader = _RingReader<T>;
     using RingStorage = _RingStorage<T>;
@@ -258,9 +267,9 @@ public:
         }
     }
 
-private:
-    _RingReaderDispatcher(
-        const typename RingStorage::Ptr &storage, std::function<void(int, bool)> onSizeChanged) {
+   private:
+    _RingReaderDispatcher(const typename RingStorage::Ptr &storage,
+                          std::function<void(int, bool)> onSizeChanged) {
         _reader_size = 0;
         _storage = storage;
         _on_size_changed = std::move(onSizeChanged);
@@ -296,12 +305,15 @@ private:
         }
     }
 
-    std::shared_ptr<RingReader> attach(const EventPoller::Ptr &poller, bool use_cache) {
+    std::shared_ptr<RingReader> attach(const EventPoller::Ptr &poller,
+                                       bool use_cache) {
         if (!poller->isCurrentThread()) {
-            throw std::runtime_error("You can attach RingBuffer only in it's poller thread");
+            throw std::runtime_error(
+                "You can attach RingBuffer only in it's poller thread");
         }
 
-        std::weak_ptr<_RingReaderDispatcher> weak_self = this->shared_from_this();
+        std::weak_ptr<_RingReaderDispatcher> weak_self =
+            this->shared_from_this();
         auto on_dealloc = [weak_self, poller](RingReader *ptr) {
             poller->async([weak_self, ptr]() {
                 auto strong_self = weak_self.lock();
@@ -313,14 +325,17 @@ private:
             });
         };
 
-        std::shared_ptr<RingReader> reader(new RingReader(use_cache ? _storage : nullptr), on_dealloc);
+        std::shared_ptr<RingReader> reader(
+            new RingReader(use_cache ? _storage : nullptr), on_dealloc);
         _reader_map[reader.get()] = reader;
         ++_reader_size;
         onSizeChanged(true);
         return reader;
     }
 
-    void onSizeChanged(bool add_flag) { _on_size_changed(_reader_size, add_flag); }
+    void onSizeChanged(bool add_flag) {
+        _on_size_changed(_reader_size, add_flag);
+    }
 
     void clearCache() {
         if (_reader_size == 0) {
@@ -344,7 +359,7 @@ private:
         return ret;
     }
 
-private:
+   private:
     std::atomic_int _reader_size;
     std::function<void(int, bool)> _on_size_changed;
     typename RingStorage::Ptr _storage;
@@ -353,7 +368,7 @@ private:
 
 template <typename T>
 class RingBuffer : public std::enable_shared_from_this<RingBuffer<T>> {
-public:
+   public:
     using Ptr = std::shared_ptr<RingBuffer>;
     using RingReader = _RingReader<T>;
     using RingStorage = _RingStorage<T>;
@@ -361,11 +376,12 @@ public:
     using onReaderChanged = std::function<void(int size)>;
     using onGetInfoCB = std::function<void(std::list<Any> &info_list)>;
 
-    RingBuffer(size_t max_size = 1024, onReaderChanged cb = nullptr, size_t max_gop_size = 1) {
+    RingBuffer(size_t max_size = 1024, onReaderChanged cb = nullptr,
+               size_t max_gop_size = 1) {
         _storage = std::make_shared<RingStorage>(max_size, max_gop_size);
         _on_reader_changed = cb ? std::move(cb) : [](int size) {};
         //先触发无人观看  [AUTO-TRANSLATED:34c64fef]
-        //First trigger no one watching
+        // First trigger no one watching
         _on_reader_changed(0);
     }
 
@@ -381,8 +397,12 @@ public:
         for (auto &pr : _dispatcher_map) {
             auto &second = pr.second;
             //切换线程后触发onRead事件  [AUTO-TRANSLATED:4ca6647d]
-            //Switch thread and trigger onRead event
-            pr.first->async([second, in, is_key]() mutable { second->write(std::move(in), is_key); }, false);
+            // Switch thread and trigger onRead event
+            pr.first->async(
+                [second, in, is_key]() mutable {
+                    second->write(std::move(in), is_key);
+                },
+                false);
         }
         _storage->write(std::move(in), is_key);
     }
@@ -392,27 +412,36 @@ public:
         for (auto &pr : _dispatcher_map) {
             auto &second = pr.second;
             // 切换线程后触发sendMessage  [AUTO-TRANSLATED:350138c9]
-            //Switch thread and trigger sendMessage
-            pr.first->async([second, data]() { second->sendMessage(data); }, false);
+            // Switch thread and trigger sendMessage
+            pr.first->async([second, data]() { second->sendMessage(data); },
+                            false);
         }
     }
 
-    void setDelegate(const typename RingDelegate<T>::Ptr &delegate) { _delegate = delegate; }
+    void setDelegate(const typename RingDelegate<T>::Ptr &delegate) {
+        _delegate = delegate;
+    }
 
-    std::shared_ptr<RingReader> attach(const EventPoller::Ptr &poller, bool use_cache = true) {
+    std::shared_ptr<RingReader> attach(const EventPoller::Ptr &poller,
+                                       bool use_cache = true) {
         typename RingReaderDispatcher::Ptr dispatcher;
         {
             LOCK_GUARD(_mtx_map);
             auto &ref = _dispatcher_map[poller];
             if (!ref) {
                 std::weak_ptr<RingBuffer> weak_self = this->shared_from_this();
-                auto onSizeChanged = [weak_self, poller](int size, bool add_flag) {
+                auto onSizeChanged = [weak_self, poller](int size,
+                                                         bool add_flag) {
                     if (auto strong_self = weak_self.lock()) {
                         strong_self->onSizeChanged(poller, size, add_flag);
                     }
                 };
-                auto onDealloc = [poller](RingReaderDispatcher *ptr) { poller->async([ptr]() { delete ptr; }); };
-                ref.reset(new RingReaderDispatcher(_storage->clone(), std::move(onSizeChanged)), std::move(onDealloc));
+                auto onDealloc = [poller](RingReaderDispatcher *ptr) {
+                    poller->async([ptr]() { delete ptr; });
+                };
+                ref.reset(new RingReaderDispatcher(_storage->clone(),
+                                                   std::move(onSizeChanged)),
+                          std::move(onDealloc));
             }
             dispatcher = ref;
         }
@@ -428,47 +457,54 @@ public:
         for (auto &pr : _dispatcher_map) {
             auto &second = pr.second;
             //切换线程后清空缓存  [AUTO-TRANSLATED:150f7fa4]
-            //Switch thread and clear cache
+            // Switch thread and clear cache
             pr.first->async([second]() { second->clearCache(); }, false);
         }
     }
 
-    void getInfoList(const onGetInfoCB &cb, const typename RingReaderDispatcher::onChangeInfoCB &on_change = nullptr) {
+    void getInfoList(const onGetInfoCB &cb,
+                     const typename RingReaderDispatcher::onChangeInfoCB
+                         &on_change = nullptr) {
         if (!cb) {
             return;
         }
         if (!on_change) {
-            const_cast<typename RingReaderDispatcher::onChangeInfoCB &>(on_change) = [](Any &&info) { return std::move(info); };
+            const_cast<typename RingReaderDispatcher::onChangeInfoCB &>(
+                on_change) = [](Any &&info) { return std::move(info); };
         }
 
         LOCK_GUARD(_mtx_map);
 
         auto info_vec = std::make_shared<std::vector<std::list<Any>>>();
         // 1、最少确保一个元素  [AUTO-TRANSLATED:6dafe078]
-        //1. Ensure at least one element
+        // 1. Ensure at least one element
         info_vec->resize(_dispatcher_map.empty() ? 1 : _dispatcher_map.size());
-        std::shared_ptr<void> on_finished(nullptr, [cb, info_vec](void *) mutable {
-            // 2、防止这里为空  [AUTO-TRANSLATED:4484baf7]
-            //2. Prevent this from being empty
-            auto &lst = *info_vec->begin();
-            for (auto &item : *info_vec) {
-                if (&lst != &item) {
-                    lst.insert(lst.end(), item.begin(), item.end());
+        std::shared_ptr<void> on_finished(
+            nullptr, [cb, info_vec](void *) mutable {
+                // 2、防止这里为空  [AUTO-TRANSLATED:4484baf7]
+                // 2. Prevent this from being empty
+                auto &lst = *info_vec->begin();
+                for (auto &item : *info_vec) {
+                    if (&lst != &item) {
+                        lst.insert(lst.end(), item.begin(), item.end());
+                    }
                 }
-            }
-            cb(lst);
-        });
+                cb(lst);
+            });
 
         auto i = 0U;
         for (auto &pr : _dispatcher_map) {
             auto &second = pr.second;
-            pr.first->async([second, info_vec, on_finished, i, on_change]() { (*info_vec)[i] = second->getInfoList(on_change); });
+            pr.first->async([second, info_vec, on_finished, i, on_change]() {
+                (*info_vec)[i] = second->getInfoList(on_change);
+            });
             ++i;
         }
     }
 
-private:
-    void onSizeChanged(const EventPoller::Ptr &poller, int size, bool add_flag) {
+   private:
+    void onSizeChanged(const EventPoller::Ptr &poller, int size,
+                       bool add_flag) {
         if (size == 0) {
             LOCK_GUARD(_mtx_map);
             _dispatcher_map.erase(poller);
@@ -482,18 +518,22 @@ private:
         _on_reader_changed(_total_count);
     }
 
-private:
+   private:
     struct HashOfPtr {
-        std::size_t operator()(const EventPoller::Ptr &key) const { return (std::size_t)key.get(); }
+        std::size_t operator()(const EventPoller::Ptr &key) const {
+            return (std::size_t)key.get();
+        }
     };
 
-private:
+   private:
     std::mutex _mtx_map;
-    std::atomic_int _total_count { 0 };
+    std::atomic_int _total_count{0};
     typename RingStorage::Ptr _storage;
     typename RingDelegate<T>::Ptr _delegate;
     onReaderChanged _on_reader_changed;
-    std::unordered_map<EventPoller::Ptr, typename RingReaderDispatcher::Ptr, HashOfPtr> _dispatcher_map;
+    std::unordered_map<EventPoller::Ptr, typename RingReaderDispatcher::Ptr,
+                       HashOfPtr>
+        _dispatcher_map;
 };
 
 } /* namespace toolkit */

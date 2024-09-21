@@ -11,9 +11,10 @@
 #ifndef ZLTOOLKIT_TASKEXECUTOR_H
 #define ZLTOOLKIT_TASKEXECUTOR_H
 
-#include <mutex>
-#include <memory>
 #include <functional>
+#include <memory>
+#include <mutex>
+
 #include "Util/List.h"
 #include "Util/util.h"
 
@@ -22,19 +23,20 @@ namespace toolkit {
 /**
 * cpu负载计算器
  * CPU Load Calculator
- 
+
  * [AUTO-TRANSLATED:46dad663]
 */
 class ThreadLoadCounter {
-public:
+   public:
     /**
      * 构造函数
      * @param max_size 统计样本数量
      * @param max_usec 统计时间窗口,亦即最近{max_usec}的cpu负载率
      * Constructor
      * @param max_size Number of statistical samples
-     * @param max_usec Statistical time window, i.e., the CPU load rate for the most recent {max_usec}
-     
+     * @param max_usec Statistical time window, i.e., the CPU load rate for the
+     most recent {max_usec}
+
      * [AUTO-TRANSLATED:718cb173]
      */
     ThreadLoadCounter(uint64_t max_size, uint64_t max_usec);
@@ -43,7 +45,7 @@ public:
     /**
      * 线程进入休眠
      * Thread enters sleep
-     
+
      * [AUTO-TRANSLATED:d831fad1]
      */
     void startSleep();
@@ -51,7 +53,7 @@ public:
     /**
      * 休眠唤醒,结束休眠
      * Wake up from sleep, end sleep
-     
+
      * [AUTO-TRANSLATED:361831f8]
      */
     void sleepWakeUp();
@@ -61,12 +63,12 @@ public:
      * @return 当前线程cpu使用率
      * Returns the current thread's CPU usage rate, ranging from 0 to 100
      * @return Current thread's CPU usage rate
-     
+
      * [AUTO-TRANSLATED:c9953342]
      */
     int load();
 
-private:
+   private:
     struct TimeRecord {
         TimeRecord(uint64_t tm, bool slp) {
             _time = tm;
@@ -77,7 +79,7 @@ private:
         uint64_t _time;
     };
 
-private:
+   private:
     bool _sleeping = true;
     uint64_t _last_sleep_time;
     uint64_t _last_wake_time;
@@ -88,42 +90,36 @@ private:
 };
 
 class TaskCancelable : public noncopyable {
-public:
+   public:
     TaskCancelable() = default;
     virtual ~TaskCancelable() = default;
     virtual void cancel() = 0;
 };
 
-template<class R, class... ArgTypes>
+template <class R, class... ArgTypes>
 class TaskCancelableImp;
 
-template<class R, class... ArgTypes>
+template <class R, class... ArgTypes>
 class TaskCancelableImp<R(ArgTypes...)> : public TaskCancelable {
-public:
+   public:
     using Ptr = std::shared_ptr<TaskCancelableImp>;
     using func_type = std::function<R(ArgTypes...)>;
 
     ~TaskCancelableImp() = default;
 
-    template<typename FUNC>
+    template <typename FUNC>
     TaskCancelableImp(FUNC &&task) {
         _strongTask = std::make_shared<func_type>(std::forward<FUNC>(task));
         _weakTask = _strongTask;
     }
 
-    void cancel() override {
-        _strongTask = nullptr;
-    }
+    void cancel() override { _strongTask = nullptr; }
 
-    operator bool() {
-        return _strongTask && *_strongTask;
-    }
+    operator bool() { return _strongTask && *_strongTask; }
 
-    void operator=(std::nullptr_t) {
-        _strongTask = nullptr;
-    }
+    void operator=(std::nullptr_t) { _strongTask = nullptr; }
 
-    R operator()(ArgTypes ...args) const {
+    R operator()(ArgTypes... args) const {
         auto strongTask = _weakTask.lock();
         if (strongTask && *strongTask) {
             return (*strongTask)(std::forward<ArgTypes>(args)...);
@@ -131,23 +127,23 @@ public:
         return defaultValue<R>();
     }
 
-    template<typename T>
+    template <typename T>
     static typename std::enable_if<std::is_void<T>::value, void>::type
     defaultValue() {}
 
-    template<typename T>
+    template <typename T>
     static typename std::enable_if<std::is_pointer<T>::value, T>::type
     defaultValue() {
         return nullptr;
     }
 
-    template<typename T>
+    template <typename T>
     static typename std::enable_if<std::is_integral<T>::value, T>::type
     defaultValue() {
         return 0;
     }
 
-protected:
+   protected:
     std::weak_ptr<func_type> _weakTask;
     std::shared_ptr<func_type> _strongTask;
 };
@@ -156,7 +152,7 @@ using TaskIn = std::function<void()>;
 using Task = TaskCancelableImp<void()>;
 
 class TaskExecutorInterface {
-public:
+   public:
     TaskExecutorInterface() = default;
     virtual ~TaskExecutorInterface() = default;
 
@@ -169,7 +165,7 @@ public:
      * @param task Task
      * @param may_sync Whether to allow synchronous execution of the task
      * @return Whether the task was added successfully
-     
+
      * [AUTO-TRANSLATED:271d48a2]
      */
     virtual Task::Ptr async(TaskIn task, bool may_sync = true) = 0;
@@ -183,7 +179,7 @@ public:
      * @param task Task
      * @param may_sync Whether to allow synchronous execution of the task
      * @return Whether the task was added successfully
-     
+
      * [AUTO-TRANSLATED:d52ce80b]
      */
     virtual Task::Ptr async_first(TaskIn task, bool may_sync = true);
@@ -195,7 +191,7 @@ public:
      * Synchronously execute a task
      * @param task
      * @return
-     
+
      * [AUTO-TRANSLATED:24854b4a]
      */
     void sync(const TaskIn &task);
@@ -207,7 +203,7 @@ public:
      * Synchronously execute a task with the highest priority
      * @param task
      * @return
-     
+
      * [AUTO-TRANSLATED:3d15452d]
      */
     void sync_first(const TaskIn &task);
@@ -216,18 +212,93 @@ public:
 /**
 * 任务执行器
  * Task Executor
- 
+
  * [AUTO-TRANSLATED:630c364f]
 */
 class TaskExecutor : public ThreadLoadCounter, public TaskExecutorInterface {
-public:
+   public:
     using Ptr = std::shared_ptr<TaskExecutor>;
 
     /**
      * 构造函数
      * @param max_size cpu负载统计样本数
      * @param max_usec cpu负载统计时间窗口大小
-     fade fade оч fadeSalvar :::.Enums fade fade fade fade оч fade fade fade fade ::: fade fade fade fade fade fade fade fade_Checked fade fade fade fade_TYPEDEF fade fade fade fade fadeSalvar fade fade fade fade.Enums fade fade fade оч fade fade fade_Checked_Checked fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade оч fade fade fade fade fade_Checked fade fade fade fade fade оч fade fade fade fade fade fade fade fade fade_TYPEDEF fade fade_TYPEDEF fade fade fadeSalvar fade fade fade fade fade fade fade fade fade оч fade.Enums fade fade оч fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade оч оч fade fade fade fade fade fade.Enums fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade.Enums fade fade.Enums_Checked_TYPEDEF fade.Enums_CheckedSalvar fade fade fade fade fade fade fade ::: fade.Enums fade fade fade fade fade fade.Enums fade.Enums fade fade fade fade fade fade_Checked fade fade fade fade fade fade fade fade fade fade fade.Enums fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade.Enums fade fade fade fade fade fade fade fade fade fade fade fade fade оч fade fade оч fade fade fade fade fade fade fade fade оч fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fadeSalvar fade fade fade fade fade fade fade fade fade fade fade fade fade.Enums fade fade fade fade fade fade fade fade оч оч fade fade.Enums fade fade ::: fade fade fade fade fade fade оч fade_Checked fade fade fade fade fade fade fade.Enums fade fade fade fade fade fade_Checked fade fade fade fade fade fade оч fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade ::: fade fade fade fade fade fade fade fade fade fade fade оч fade_Checked AsyncStorage fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade_Checked fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade_Checked fade.Enums fade fade fade fade fade fade fade fade fade fadeSalvar fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade.Enums_TYPEDEF fade fade fade fade fade fade fade fade fade fade оч fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade оч fade fade fade fade fade fade fade fade fade fade fade fade fade.Enums ::: fade fade fade fade fade fade fade.Enums fade fade fade fade fade fadeSalvar оч fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fadeSalvar fade fade fade fade fadeSalvar fade fade fade fade fade fade fade fade fade fade оч fade fade Bai.Enums fade fade fade fade fade fade fade fade fade fade.Enums fade fade fade очSalvar fade fade fade fade fade fade fade_Checked fade fade fade fade fade fade fade оч fade fade fade fade fade fade fade fade :::_Checked ::: fade fade fade fade fade fade fade fade Bai fade fade оч fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fadeSalvar fade fade fade fade fade fade fade fade fadeSalvar fade fade fade fade fade fade fade.Enums fade fade fade fade fade fade fade fade ::: fade_Checked fade fade fade fade fade fade fade fade fade fade fade.Enums fade fade fade fade fade fade fade fade fade fade fade.Enums fade fade оч fade.Enums fade оч fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade оч.Enums ::: fade fade fade fade fade fade fade fade fade.Enums fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade.Enums fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade оч fade fade fade fade fade fade fade fade fade fade fade fade fade оч fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade оч fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade оч оч fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fadeSalvar fade fade fade fade fade fade fade fade fade fade fade fade_TYPEDEF fade оч fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade.Enums fade fade fade fade ::: fade fade fade fade fade fade fade fade fade fade fade fade fade.Enums fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade_TYPEDEF fade fade fade fadeSalvar.Enums fade fade ::: fade fade fade fade оч fade fadeSalvar fade fade fade ::: fade fade fade fade fade fade fade fade fade fade fade fade fade fadedl fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade.Enums fade fade fade оч fade fade fade fade fade fade fade fade fade fade fade оч fade fade fade fade fade fade fade fade fade ::: fade fade fade fade fade fade fade fade Bai fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade.Enums fade fade fade fade fade fade fade fade fade fade fadeSalvar fade fade fade fade fade fade fade fade fade fade fade fade fade оч fade fade fade fade fade fade fade fade fade fade fade fade fade_TYPEDEF fade fade fade fade fade оч fade fade fade fade fade fade fade.Enums fade fade fade fade fade fade fade fade fade
+     fade fade оч fadeSalvar :::.Enums fade fade fade fade оч fade fade fade
+     fade ::: fade fade fade fade fade fade fade fade_Checked fade fade fade
+     fade_TYPEDEF fade fade fade fade fadeSalvar fade fade fade fade.Enums fade
+     fade fade оч fade fade fade_Checked_Checked fade fade fade fade fade fade
+     fade fade fade fade fade fade fade fade fade оч fade fade fade fade
+     fade_Checked fade fade fade fade fade оч fade fade fade fade fade fade fade
+     fade fade_TYPEDEF fade fade_TYPEDEF fade fade fadeSalvar fade fade fade
+     fade fade fade fade fade fade оч fade.Enums fade fade оч fade fade fade
+     fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade
+     fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade
+     fade fade fade fade оч оч fade fade fade fade fade fade.Enums fade fade
+     fade fade fade fade fade fade fade fade fade fade fade fade fade fade
+     fade.Enums fade fade.Enums_Checked_TYPEDEF fade.Enums_CheckedSalvar fade
+     fade fade fade fade fade fade ::: fade.Enums fade fade fade fade fade
+     fade.Enums fade.Enums fade fade fade fade fade fade_Checked fade fade fade
+     fade fade fade fade fade fade fade fade.Enums fade fade fade fade fade fade
+     fade fade fade fade fade fade fade fade fade fade fade.Enums fade fade fade
+     fade fade fade fade fade fade fade fade fade fade оч fade fade оч fade fade
+     fade fade fade fade fade fade оч fade fade fade fade fade fade fade fade
+     fade fade fade fade fade fade fade fade fade fadeSalvar fade fade fade fade
+     fade fade fade fade fade fade fade fade fade.Enums fade fade fade fade fade
+     fade fade fade оч оч fade fade.Enums fade fade ::: fade fade fade fade fade
+     fade оч fade_Checked fade fade fade fade fade fade fade.Enums fade fade
+     fade fade fade fade_Checked fade fade fade fade fade fade оч fade fade fade
+     fade fade fade fade fade fade fade fade fade fade fade fade ::: fade fade
+     fade fade fade fade fade fade fade fade fade оч fade_Checked AsyncStorage
+     fade fade fade fade fade fade fade fade fade fade fade fade fade fade
+     fade_Checked fade fade fade fade fade fade fade fade fade fade fade fade
+     fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade
+     fade fade fade fade fade fade fade fade fade_Checked fade.Enums fade fade
+     fade fade fade fade fade fade fade fadeSalvar fade fade fade fade fade fade
+     fade fade fade fade fade fade fade fade fade fade.Enums_TYPEDEF fade fade
+     fade fade fade fade fade fade fade fade оч fade fade fade fade fade fade
+     fade fade fade fade fade fade fade fade fade оч fade fade fade fade fade
+     fade fade fade fade fade fade fade fade.Enums ::: fade fade fade fade fade
+     fade fade.Enums fade fade fade fade fade fadeSalvar оч fade fade fade fade
+     fade fade fade fade fade fade fade fade fade fade fade fadeSalvar fade fade
+     fade fade fadeSalvar fade fade fade fade fade fade fade fade fade fade оч
+     fade fade Bai.Enums fade fade fade fade fade fade fade fade fade fade.Enums
+     fade fade fade очSalvar fade fade fade fade fade fade fade_Checked fade
+     fade fade fade fade fade fade оч fade fade fade fade fade fade fade fade
+     :::_Checked ::: fade fade fade fade fade fade fade fade Bai fade fade оч
+     fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade
+     fade fade fade fade fade fade fade fadeSalvar fade fade fade fade fade fade
+     fade fade fadeSalvar fade fade fade fade fade fade fade.Enums fade fade
+     fade fade fade fade fade fade ::: fade_Checked fade fade fade fade fade
+     fade fade fade fade fade fade.Enums fade fade fade fade fade fade fade fade
+     fade fade fade.Enums fade fade оч fade.Enums fade оч fade fade fade fade
+     fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade
+     fade fade оч.Enums ::: fade fade fade fade fade fade fade fade fade.Enums
+     fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade
+     fade fade fade.Enums fade fade fade fade fade fade fade fade fade fade fade
+     fade fade fade fade fade оч fade fade fade fade fade fade fade fade fade
+     fade fade fade fade оч fade fade fade fade fade fade fade fade fade fade
+     fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade
+     fade fade fade fade fade fade fade fade fade fade оч fade fade fade fade
+     fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade
+     fade fade fade оч оч fade fade fade fade fade fade fade fade fade fade fade
+     fade fade fade fade fadeSalvar fade fade fade fade fade fade fade fade fade
+     fade fade fade_TYPEDEF fade оч fade fade fade fade fade fade fade fade fade
+     fade fade fade fade fade fade.Enums fade fade fade fade ::: fade fade fade
+     fade fade fade fade fade fade fade fade fade fade.Enums fade fade fade fade
+     fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade
+     fade fade fade fade fade fade fade fade fade fade fade_TYPEDEF fade fade
+     fade fadeSalvar.Enums fade fade ::: fade fade fade fade оч fade fadeSalvar
+     fade fade fade ::: fade fade fade fade fade fade fade fade fade fade fade
+     fade fade fadedl fade fade fade fade fade fade fade fade fade fade fade
+     fade fade fade fade fade fade fade fade fade fade fade.Enums fade fade fade
+     оч fade fade fade fade fade fade fade fade fade fade fade оч fade fade fade
+     fade fade fade fade fade fade ::: fade fade fade fade fade fade fade fade
+     Bai fade fade fade fade fade fade fade fade fade fade fade fade fade fade
+     fade fade fade fade.Enums fade fade fade fade fade fade fade fade fade fade
+     fadeSalvar fade fade fade fade fade fade fade fade fade fade fade fade fade
+     оч fade fade fade fade fade fade fade fade fade fade fade fade fade_TYPEDEF
+     fade fade fade fade fade оч fade fade fade fade fade fade fade.Enums fade
+     fade fade fade fade fade fade fade fade
      * [AUTO-TRANSLATED:bd07d170]
      */
     TaskExecutor(uint64_t max_size = 32, uint64_t max_usec = 2 * 1000 * 1000);
@@ -235,7 +306,7 @@ public:
 };
 
 class TaskExecutorGetter {
-public:
+   public:
     using Ptr = std::shared_ptr<TaskExecutorGetter>;
 
     virtual ~TaskExecutorGetter() = default;
@@ -253,7 +324,7 @@ public:
 };
 
 class TaskExecutorGetterImp : public TaskExecutorGetter {
-public:
+   public:
     TaskExecutorGetterImp() = default;
     ~TaskExecutorGetterImp() = default;
 
@@ -274,7 +345,8 @@ public:
      * 通过此函数也可以大概知道线程负载情况
      * @return
      */
-    void getExecutorDelay(const std::function<void(const std::vector<int> &)> &callback);
+    void getExecutorDelay(
+        const std::function<void(const std::vector<int> &)> &callback);
 
     /**
      * 遍历所有线程
@@ -286,13 +358,14 @@ public:
      */
     size_t getExecutorSize() const override;
 
-protected:
-    size_t addPoller(const std::string &name, size_t size, int priority, bool register_thread, bool enable_cpu_affinity = true);
+   protected:
+    size_t addPoller(const std::string &name, size_t size, int priority,
+                     bool register_thread, bool enable_cpu_affinity = true);
 
-protected:
+   protected:
     size_t _thread_pos = 0;
     std::vector<TaskExecutor::Ptr> _threads;
 };
 
-}//toolkit
-#endif //ZLTOOLKIT_TASKEXECUTOR_H
+}  // namespace toolkit
+#endif  // ZLTOOLKIT_TASKEXECUTOR_H

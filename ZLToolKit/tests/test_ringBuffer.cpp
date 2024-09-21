@@ -10,11 +10,12 @@
 
 #include <csignal>
 #include <iostream>
+#include <list>
+
+#include "Thread/threadgroup.h"
+#include "Util/RingBuffer.h"
 #include "Util/logger.h"
 #include "Util/util.h"
-#include "Util/RingBuffer.h"
-#include "Thread/threadgroup.h"
-#include <list>
 
 using namespace std;
 using namespace toolkit;
@@ -29,7 +30,7 @@ RingBuffer<string>::Ptr g_ringBuf(new RingBuffer<string>(30));
 
 //写事件回调函数  [AUTO-TRANSLATED:19f6b6fa]
 // Write event callback function
-void onReadEvent(const string &str){
+void onReadEvent(const string &str) {
     //读事件模式性  [AUTO-TRANSLATED:12cdd3a8]
     // Read event mode
     DebugL << str;
@@ -37,21 +38,18 @@ void onReadEvent(const string &str){
 
 //环形缓存销毁事件  [AUTO-TRANSLATED:7da356eb]
 // Ring buffer destruction event
-void onDetachEvent(){
-    WarnL;
-}
+void onDetachEvent() { WarnL; }
 
 //写环形缓存任务  [AUTO-TRANSLATED:1467fea5]
 // Write ring buffer task
-void doWrite(){
+void doWrite() {
     int i = 0;
-    while(!g_bExitWrite){
+    while (!g_bExitWrite) {
         //每隔100ms写一个数据到环形缓存  [AUTO-TRANSLATED:aedec620]
         // Write data to the ring buffer every 100ms
-        g_ringBuf->write(to_string(++i),true);
+        g_ringBuf->write(to_string(++i), true);
         usleep(100 * 1000);
     }
-
 }
 int main() {
     //初始化日志  [AUTO-TRANSLATED:371bb4e5]
@@ -61,31 +59,24 @@ int main() {
 
     auto poller = EventPollerPool::Instance().getPoller();
     RingBuffer<string>::RingReader::Ptr ringReader;
-    poller->sync([&](){
+    poller->sync([&]() {
         //从环形缓存获取一个读取器  [AUTO-TRANSLATED:c61b1c37]
         // Get a reader from the ring buffer
         ringReader = g_ringBuf->attach(poller);
 
         //设置读取事件  [AUTO-TRANSLATED:6d9e7c68]
         // Set read event
-        ringReader->setReadCB([](const string &pkt){
-            onReadEvent(pkt);
-        });
+        ringReader->setReadCB([](const string &pkt) { onReadEvent(pkt); });
 
         //设置环形缓存销毁事件  [AUTO-TRANSLATED:8fc24dc3]
         // Set ring buffer destruction event
-        ringReader->setDetachCB([](){
-            onDetachEvent();
-        });
+        ringReader->setDetachCB([]() { onDetachEvent(); });
     });
-
 
     thread_group group;
     //写线程  [AUTO-TRANSLATED:f91ceacd]
     // Write thread
-    group.create_thread([](){
-        doWrite();
-    });
+    group.create_thread([]() { doWrite(); });
 
     //测试3秒钟  [AUTO-TRANSLATED:942e7c08]
     // Test for 3 seconds
@@ -110,14 +101,3 @@ int main() {
     sleep(1);
     return 0;
 }
-
-
-
-
-
-
-
-
-
-
-

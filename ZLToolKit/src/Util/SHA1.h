@@ -23,9 +23,8 @@
 
 namespace toolkit {
 
-class SHA1 final
-{
-public:
+class SHA1 final {
+   public:
     SHA1();
 
     void update(const std::string &s);
@@ -38,10 +37,10 @@ public:
     static std::string encode(const std::string &s);
     static std::string encode_bin(const std::string &s);
 
-private:
+   private:
     uint32_t digest[5];
     std::string buffer;
     uint64_t transforms;
 };
 
-}//namespace toolkit
+}  // namespace toolkit

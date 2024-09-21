@@ -8,59 +8,57 @@
  * may be found in the AUTHORS file in the root of the source tree.
  */
 
+#include "util.h"
+
+#include <algorithm>
 #include <cassert>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <string>
-#include <algorithm>
 #include <random>
+#include <string>
 
-#include "util.h"
-#include "local_time.h"
 #include "File.h"
-#include "onceToken.h"
-#include "logger.h"
-#include "uv_errno.h"
 #include "Network/sockutil.h"
+#include "local_time.h"
+#include "logger.h"
+#include "onceToken.h"
+#include "uv_errno.h"
 
 #if defined(_WIN32)
+#include <shlwapi.h>
+
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <shlwapi.h>
 #pragma comment(lib, "shlwapi.lib")
 extern "C" const IMAGE_DOS_HEADER __ImageBase;
-#endif // defined(_WIN32)
+#endif  // defined(_WIN32)
 
 #if defined(__MACH__) || defined(__APPLE__)
 #include <limits.h>
 #include <mach-o/dyld.h> /* _NSGetExecutablePath */
 
 int uv_exepath(char *buffer, int *size) {
-    /* realpath(exepath) may be > PATH_MAX so double it to be on the safe side. */
+    /* realpath(exepath) may be > PATH_MAX so double it to be on the safe side.
+     */
     char abspath[PATH_MAX * 2 + 1];
     char exepath[PATH_MAX + 1];
     uint32_t exepath_size;
     size_t abspath_size;
 
-    if (buffer == nullptr || size == nullptr || *size == 0)
-        return -EINVAL;
+    if (buffer == nullptr || size == nullptr || *size == 0) return -EINVAL;
 
     exepath_size = sizeof(exepath);
-    if (_NSGetExecutablePath(exepath, &exepath_size))
-        return -EIO;
+    if (_NSGetExecutablePath(exepath, &exepath_size)) return -EIO;
 
-    if (realpath(exepath, abspath) != abspath)
-        return -errno;
+    if (realpath(exepath, abspath) != abspath) return -errno;
 
     abspath_size = strlen(abspath);
-    if (abspath_size == 0)
-        return -EIO;
+    if (abspath_size == 0) return -EIO;
 
     *size -= 1;
-    if ((size_t) *size > abspath_size)
-        *size = abspath_size;
+    if ((size_t)*size > abspath_size) *size = abspath_size;
 
     memcpy(buffer, abspath, *size);
     buffer[*size] = '\0';
@@ -68,13 +66,14 @@ int uv_exepath(char *buffer, int *size) {
     return 0;
 }
 
-#endif //defined(__MACH__) || defined(__APPLE__)
+#endif  // defined(__MACH__) || defined(__APPLE__)
 
 using namespace std;
 
 namespace toolkit {
 
-static constexpr char CCH[] = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+static constexpr char CCH[] =
+    "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
 string makeRandStr(int sz, bool printable) {
     string ret;
@@ -91,14 +90,12 @@ string makeRandStr(int sz, bool printable) {
     return ret;
 }
 
-bool is_safe(uint8_t b) {
-    return b >= ' ' && b < 128;
-}
+bool is_safe(uint8_t b) { return b >= ' ' && b < 128; }
 
 string hexdump(const void *buf, size_t len) {
     string ret("\r\n");
     char tmp[8];
-    const uint8_t *data = (const uint8_t *) buf;
+    const uint8_t *data = (const uint8_t *)buf;
     for (size_t i = 0; i < len; i += 16) {
         for (int j = 0; j < 16; ++j) {
             if (i + j < len) {
@@ -124,7 +121,7 @@ string hexdump(const void *buf, size_t len) {
 string hexmem(const void *buf, size_t len) {
     string ret;
     char tmp[8];
-    const uint8_t *data = (const uint8_t *) buf;
+    const uint8_t *data = (const uint8_t *)buf;
     for (size_t i = 0; i < len; ++i) {
         int sz = sprintf(tmp, "%.2x ", data[i]);
         ret.append(tmp, sz);
@@ -136,7 +133,8 @@ string exePath(bool isExe /*= true*/) {
     char buffer[PATH_MAX * 2 + 1] = {0};
     int n = -1;
 #if defined(_WIN32)
-    n = GetModuleFileNameA(isExe?nullptr:(HINSTANCE)&__ImageBase, buffer, sizeof(buffer));
+    n = GetModuleFileNameA(isExe ? nullptr : (HINSTANCE)&__ImageBase, buffer,
+                           sizeof(buffer));
 #elif defined(__MACH__) || defined(__APPLE__)
     n = sizeof(buffer);
     if (uv_exepath(buffer, &n) != 0) {
@@ -154,14 +152,15 @@ string exePath(bool isExe /*= true*/) {
     }
 
 #if defined(_WIN32)
-    //windows下把路径统一转换层unix风格，因为后续都是按照unix风格处理的  [AUTO-TRANSLATED:33d86ad3]
-    //Convert paths to Unix style under Windows, as subsequent processing is done in Unix style
+    // windows下把路径统一转换层unix风格，因为后续都是按照unix风格处理的
+    // [AUTO-TRANSLATED:33d86ad3] Convert paths to Unix style under Windows, as
+    // subsequent processing is done in Unix style
     for (auto &ch : filePath) {
         if (ch == '\\') {
             ch = '/';
         }
     }
-#endif //defined(_WIN32)
+#endif  // defined(_WIN32)
 
     return filePath;
 }
@@ -177,28 +176,28 @@ string exeName(bool isExe /*= true*/) {
 }
 
 // string转小写  [AUTO-TRANSLATED:bf92618b]
-//Convert string to lowercase
+// Convert string to lowercase
 std::string &strToLower(std::string &str) {
     transform(str.begin(), str.end(), str.begin(), towlower);
     return str;
 }
 
 // string转大写  [AUTO-TRANSLATED:0197b884]
-//Convert string to uppercase
+// Convert string to uppercase
 std::string &strToUpper(std::string &str) {
     transform(str.begin(), str.end(), str.begin(), towupper);
     return str;
 }
 
 // string转小写  [AUTO-TRANSLATED:bf92618b]
-//Convert string to lowercase
+// Convert string to lowercase
 std::string strToLower(std::string &&str) {
     transform(str.begin(), str.end(), str.begin(), towlower);
     return std::move(str);
 }
 
 // string转大写  [AUTO-TRANSLATED:0197b884]
-//Convert string to uppercase
+// Convert string to uppercase
 std::string strToUpper(std::string &&str) {
     transform(str.begin(), str.end(), str.begin(), towupper);
     return std::move(str);
@@ -221,18 +220,18 @@ vector<string> split(const string &s, const char *delim) {
     return ret;
 }
 
-#define TRIM(s, chars) \
-do{ \
-    string map(0xFF, '\0'); \
-    for (auto &ch : chars) { \
-        map[(unsigned char &)ch] = '\1'; \
-    } \
-    while( s.size() && map.at((unsigned char &)s.back())) s.pop_back(); \
-    while( s.size() && map.at((unsigned char &)s.front())) s.erase(0,1); \
-}while(0);
+#define TRIM(s, chars)                                                        \
+    do {                                                                      \
+        string map(0xFF, '\0');                                               \
+        for (auto &ch : chars) {                                              \
+            map[(unsigned char &)ch] = '\1';                                  \
+        }                                                                     \
+        while (s.size() && map.at((unsigned char &)s.back())) s.pop_back();   \
+        while (s.size() && map.at((unsigned char &)s.front())) s.erase(0, 1); \
+    } while (0);
 
 //去除前后的空格、回车符、制表符  [AUTO-TRANSLATED:0b0a7fc7]
-//Remove leading and trailing spaces, carriage returns, and tabs
+// Remove leading and trailing spaces, carriage returns, and tabs
 std::string &trim(std::string &s, const string &chars) {
     TRIM(s, chars);
     return s;
@@ -243,16 +242,17 @@ std::string trim(std::string &&s, const string &chars) {
     return std::move(s);
 }
 
-void replace(string &str, const string &old_str, const string &new_str,std::string::size_type b_pos) {
+void replace(string &str, const string &old_str, const string &new_str,
+             std::string::size_type b_pos) {
     if (old_str.empty() || old_str == new_str) {
         return;
     }
-    auto pos = str.find(old_str,b_pos);
+    auto pos = str.find(old_str, b_pos);
     if (pos == string::npos) {
         return;
     }
     str.replace(pos, old_str.size(), new_str);
-    replace(str, old_str, new_str,pos + new_str.length());
+    replace(str, old_str, new_str, pos + new_str.length());
 }
 
 bool start_with(const string &str, const string &substr) {
@@ -269,27 +269,27 @@ bool isIP(const char *str) {
 }
 
 #if defined(_WIN32)
-void sleep(int second) {
-    Sleep(1000 * second);
-}
+void sleep(int second) { Sleep(1000 * second); }
 void usleep(int micro_seconds) {
     this_thread::sleep_for(std::chrono::microseconds(micro_seconds));
 }
 
 int gettimeofday(struct timeval *tp, void *tzp) {
-    auto now_stamp = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+    auto now_stamp = std::chrono::duration_cast<std::chrono::microseconds>(
+                         std::chrono::system_clock::now().time_since_epoch())
+                         .count();
     tp->tv_sec = (decltype(tp->tv_sec))(now_stamp / 1000000LL);
     tp->tv_usec = now_stamp % 1000000LL;
     return 0;
 }
 
-const char *strcasestr(const char *big, const char *little){
+const char *strcasestr(const char *big, const char *little) {
     string big_str = big;
     string little_str = little;
     strToLower(big_str);
     strToLower(little_str);
     auto pos = strstr(big_str.data(), little_str.data());
-    if (!pos){
+    if (!pos) {
         return nullptr;
     }
     return big + (pos - big_str.data());
@@ -302,7 +302,7 @@ int vasprintf(char **strp, const char *fmt, va_list ap) {
         return -1;
     }
     size_t size = (size_t)len + 1;
-    char *str = (char*)malloc(size);
+    char *str = (char *)malloc(size);
     if (!str) {
         return -1;
     }
@@ -316,7 +316,7 @@ int vasprintf(char **strp, const char *fmt, va_list ap) {
     return r;
 }
 
- int asprintf(char **strp, const char *fmt, ...) {
+int asprintf(char **strp, const char *fmt, ...) {
     va_list ap;
     va_start(ap, fmt);
     int r = vasprintf(strp, fmt, ap);
@@ -324,9 +324,9 @@ int vasprintf(char **strp, const char *fmt, va_list ap) {
     return r;
 }
 
-#endif //WIN32
+#endif  // WIN32
 
-static long s_gmtoff = 0; //时间差
+static long s_gmtoff = 0;  //时间差
 static onceToken s_token([]() {
 #ifdef _WIN32
     TIME_ZONE_INFORMATION tzinfo;
@@ -340,16 +340,14 @@ static onceToken s_token([]() {
     if (dwStandardDaylight == TIME_ZONE_ID_DAYLIGHT) {
         bias += tzinfo.DaylightBias;
     }
-    s_gmtoff = -bias * 60; //时间差(分钟)
+    s_gmtoff = -bias * 60;  //时间差(分钟)
 #else
     local_time_init();
     s_gmtoff = getLocalTime(time(nullptr)).tm_gmtoff;
-#endif // _WIN32
+#endif  // _WIN32
 });
 
-long getGMTOff() {
-    return s_gmtoff;
-}
+long getGMTOff() { return s_gmtoff; }
 
 static inline uint64_t getCurrentMicrosecondOrigin() {
 #if !defined(_WIN32)
@@ -357,14 +355,18 @@ static inline uint64_t getCurrentMicrosecondOrigin() {
     gettimeofday(&tv, nullptr);
     return tv.tv_sec * 1000000LL + tv.tv_usec;
 #else
-    return  std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+    return std::chrono::duration_cast<std::chrono::microseconds>(
+               std::chrono::system_clock::now().time_since_epoch())
+        .count();
 #endif
 }
 
 static atomic<uint64_t> s_currentMicrosecond(0);
 static atomic<uint64_t> s_currentMillisecond(0);
-static atomic<uint64_t> s_currentMicrosecond_system(getCurrentMicrosecondOrigin());
-static atomic<uint64_t> s_currentMillisecond_system(getCurrentMicrosecondOrigin() / 1000);
+static atomic<uint64_t> s_currentMicrosecond_system(
+    getCurrentMicrosecondOrigin());
+static atomic<uint64_t> s_currentMillisecond_system(
+    getCurrentMicrosecondOrigin() / 1000);
 
 static inline bool initMillisecondThread() {
     static std::thread s_thread([]() {
@@ -376,31 +378,32 @@ static inline bool initMillisecondThread() {
         while (true) {
             now = getCurrentMicrosecondOrigin();
             //记录系统时间戳，可回退  [AUTO-TRANSLATED:495a0114]
-            //Record system timestamp, can be rolled back
+            // Record system timestamp, can be rolled back
             s_currentMicrosecond_system.store(now, memory_order_release);
             s_currentMillisecond_system.store(now / 1000, memory_order_release);
 
             //记录流逝时间戳，不可回退  [AUTO-TRANSLATED:7f3a9da3]
-            //Record elapsed timestamp, cannot be rolled back
+            // Record elapsed timestamp, cannot be rolled back
             int64_t expired = now - last;
             last = now;
             if (expired > 0 && expired < 1000 * 1000) {
-                //流逝时间处于0~1000ms之间，那么是合理的，说明没有调整系统时间  [AUTO-TRANSLATED:566e1001]
-                //If the elapsed time is between 0~1000ms, it is reasonable, indicating that the system time has not been adjusted
+                //流逝时间处于0~1000ms之间，那么是合理的，说明没有调整系统时间
+                //[AUTO-TRANSLATED:566e1001] If the elapsed time is between
+                // 0~1000ms, it is reasonable, indicating that the system time
+                // has not been adjusted
                 microsecond += expired;
                 s_currentMicrosecond.store(microsecond, memory_order_release);
-                s_currentMillisecond.store(microsecond / 1000, memory_order_release);
+                s_currentMillisecond.store(microsecond / 1000,
+                                           memory_order_release);
             } else if (expired != 0) {
                 WarnL << "Stamp expired is abnormal: " << expired;
             }
             //休眠0.5 ms  [AUTO-TRANSLATED:5e20acdd]
-            //Sleep for 0.5 ms
+            // Sleep for 0.5 ms
             usleep(500);
         }
     });
-    static onceToken s_token([]() {
-        s_thread.detach();
-    });
+    static onceToken s_token([]() { s_thread.detach(); });
     return true;
 }
 
@@ -431,13 +434,11 @@ string getTimeStr(const char *fmt, time_t time) {
     size = std::strftime(&ret[0], size, fmt, &tm);
     if (size > 0) {
         ret.resize(size);
-    }
-    else{
+    } else {
         ret = fmt;
     }
     return ret;
 }
-
 
 struct tm getLocalTime(time_t sec) {
     struct tm tm;
@@ -445,7 +446,7 @@ struct tm getLocalTime(time_t sec) {
     localtime_s(&tm, &sec);
 #else
     no_locks_localtime(&tm, sec);
-#endif //_WIN32
+#endif  //_WIN32
     return tm;
 }
 
@@ -467,16 +468,23 @@ void setThreadName(const char *name) {
 #elif defined(__MACH__) || defined(__APPLE__)
     pthread_setname_np(limitString(name, 32).data());
 #elif defined(_MSC_VER)
-    // SetThreadDescription was added in 1607 (aka RS1). Since we can't guarantee the user is running 1607 or later, we need to ask for the function from the kernel.
-    using SetThreadDescriptionFunc = HRESULT(WINAPI * )(_In_ HANDLE hThread, _In_ PCWSTR lpThreadDescription);
-    static auto setThreadDescription = reinterpret_cast<SetThreadDescriptionFunc>(::GetProcAddress(::GetModuleHandle("Kernel32.dll"), "SetThreadDescription"));
+    // SetThreadDescription was added in 1607 (aka RS1). Since we can't
+    // guarantee the user is running 1607 or later, we need to ask for the
+    // function from the kernel.
+    using SetThreadDescriptionFunc =
+        HRESULT(WINAPI *)(_In_ HANDLE hThread, _In_ PCWSTR lpThreadDescription);
+    static auto setThreadDescription =
+        reinterpret_cast<SetThreadDescriptionFunc>(::GetProcAddress(
+            ::GetModuleHandle("Kernel32.dll"), "SetThreadDescription"));
     if (setThreadDescription) {
         // Convert the thread name to Unicode
         wchar_t threadNameW[MAX_PATH];
         size_t numCharsConverted;
-        errno_t wcharResult = mbstowcs_s(&numCharsConverted, threadNameW, name, MAX_PATH - 1);
+        errno_t wcharResult =
+            mbstowcs_s(&numCharsConverted, threadNameW, name, MAX_PATH - 1);
         if (wcharResult == 0) {
-            HRESULT hr = setThreadDescription(::GetCurrentThread(), threadNameW);
+            HRESULT hr =
+                setThreadDescription(::GetCurrentThread(), threadNameW);
             if (!SUCCEEDED(hr)) {
                 int i = 0;
                 i++;
@@ -489,20 +497,23 @@ void setThreadName(const char *name) {
         const DWORD MS_VC_EXCEPTION = 0x406D1388;
 #pragma pack(push, 8)
         struct THREADNAME_INFO {
-            DWORD dwType = 0x1000; // Must be 0x1000
-            LPCSTR szName;         // Pointer to name (in user address space)
-            DWORD dwThreadID;      // Thread ID (-1 for caller thread)
-            DWORD dwFlags = 0;     // Reserved for future use; must be zero
+            DWORD dwType = 0x1000;  // Must be 0x1000
+            LPCSTR szName;          // Pointer to name (in user address space)
+            DWORD dwThreadID;       // Thread ID (-1 for caller thread)
+            DWORD dwFlags = 0;      // Reserved for future use; must be zero
         };
 #pragma pack(pop)
 
         THREADNAME_INFO info;
         info.szName = name;
-        info.dwThreadID = (DWORD) - 1;
+        info.dwThreadID = (DWORD)-1;
 
-        __try{
-                RaiseException(MS_VC_EXCEPTION, 0, sizeof(info) / sizeof(ULONG_PTR), reinterpret_cast<const ULONG_PTR *>(&info));
-        } __except(GetExceptionCode() == MS_VC_EXCEPTION ? EXCEPTION_CONTINUE_EXECUTION : EXCEPTION_EXECUTE_HANDLER) {
+        __try {
+            RaiseException(MS_VC_EXCEPTION, 0, sizeof(info) / sizeof(ULONG_PTR),
+                           reinterpret_cast<const ULONG_PTR *>(&info));
+        } __except (GetExceptionCode() == MS_VC_EXCEPTION
+                        ? EXCEPTION_CONTINUE_EXECUTION
+                        : EXCEPTION_EXECUTE_HANDLER) {
         }
     }
 #else
@@ -511,19 +522,24 @@ void setThreadName(const char *name) {
 }
 
 string getThreadName() {
-#if ((defined(__linux) || defined(__linux__)) && !defined(ANDROID)) || (defined(__MACH__) || defined(__APPLE__)) || (defined(ANDROID) && __ANDROID_API__ >= 26) || defined(__MINGW32__)
+#if ((defined(__linux) || defined(__linux__)) && !defined(ANDROID)) || \
+    (defined(__MACH__) || defined(__APPLE__)) ||                       \
+    (defined(ANDROID) && __ANDROID_API__ >= 26) || defined(__MINGW32__)
     string ret;
     ret.resize(32);
     auto tid = pthread_self();
-    pthread_getname_np(tid, (char *) ret.data(), ret.size());
+    pthread_getname_np(tid, (char *)ret.data(), ret.size());
     if (ret[0]) {
         ret.resize(strlen(ret.data()));
         return ret;
     }
-    return to_string((uint64_t) tid);
+    return to_string((uint64_t)tid);
 #elif defined(_MSC_VER)
-    using GetThreadDescriptionFunc = HRESULT(WINAPI * )(_In_ HANDLE hThread, _In_ PWSTR * ppszThreadDescription);
-    static auto getThreadDescription = reinterpret_cast<GetThreadDescriptionFunc>(::GetProcAddress(::GetModuleHandleA("Kernel32.dll"), "GetThreadDescription"));
+    using GetThreadDescriptionFunc = HRESULT(WINAPI *)(
+        _In_ HANDLE hThread, _In_ PWSTR * ppszThreadDescription);
+    static auto getThreadDescription =
+        reinterpret_cast<GetThreadDescriptionFunc>(::GetProcAddress(
+            ::GetModuleHandleA("Kernel32.dll"), "GetThreadDescription"));
 
     if (!getThreadDescription) {
         std::ostringstream ss;
@@ -535,7 +551,8 @@ string getThreadName() {
         if (SUCCEEDED(hr) && data[0] != '\0') {
             char threadName[MAX_PATH];
             size_t numCharsConverted;
-            errno_t charResult = wcstombs_s(&numCharsConverted, threadName, data, MAX_PATH - 1);
+            errno_t charResult =
+                wcstombs_s(&numCharsConverted, threadName, data, MAX_PATH - 1);
             if (charResult == 0) {
                 LocalFree(data);
                 std::ostringstream ss;
@@ -545,13 +562,13 @@ string getThreadName() {
                 if (data) {
                     LocalFree(data);
                 }
-                return to_string((uint64_t) GetCurrentThreadId());
+                return to_string((uint64_t)GetCurrentThreadId());
             }
         } else {
             if (data) {
                 LocalFree(data);
             }
-            return to_string((uint64_t) GetCurrentThreadId());
+            return to_string((uint64_t)GetCurrentThreadId());
         }
     }
 #else
@@ -631,10 +648,10 @@ string demangle(const char *mangled) {
     demangled = abi::__cxa_demangle(mangled, nullptr, nullptr, &status);
 #endif
     string out;
-    if (status == 0 && demangled) { // Demangling succeeeded.
+    if (status == 0 && demangled) {  // Demangling succeeeded.
         out.append(demangled);
 #ifdef ASAN_USE_DELETE
-        delete [] demangled; // 开启asan后，用free会卡死
+        delete[] demangled;  // 开启asan后，用free会卡死
 #else
         free(demangled);
 #endif
@@ -653,23 +670,24 @@ string getEnv(const string &key) {
     return value ? value : "";
 }
 
-
 void Creator::onDestoryException(const type_info &info, const exception &ex) {
-    ErrorL << "Invoke " << demangle(info.name()) << "::onDestory throw a exception: " << ex.what();
+    ErrorL << "Invoke " << demangle(info.name())
+           << "::onDestory throw a exception: " << ex.what();
 }
 
 }  // namespace toolkit
 
-
 extern "C" {
-void Assert_Throw(int failed, const char *exp, const char *func, const char *file, int line, const char *str) {
+void Assert_Throw(int failed, const char *exp, const char *func,
+                  const char *file, int line, const char *str) {
     if (failed) {
         toolkit::_StrPrinter printer;
-        printer << "Assertion failed: (" << exp ;
-        if(str && *str){
+        printer << "Assertion failed: (" << exp;
+        if (str && *str) {
             printer << ", " << str;
         }
-        printer << "), function " << func << ", file " << file << ", line " << line << ".";
+        printer << "), function " << func << ", file " << file << ", line "
+                << line << ".";
         throw toolkit::AssertFailedException(printer);
     }
 }

@@ -5,11 +5,11 @@
  * This software is provided 'as-is', without any express or implied
  * warranty.  In no event will the authors be held liable for any damages
  * arising from the use of this software.
- * 
+ *
  * Permission is granted to anyone to use this software for any purpose,
  * including commercial applications, and to alter it and redistribute it
  * freely, subject to the following restrictions:
- * 
+ *
  * 1. The origin of this software must not be misrepresented; you must not
  * claim that you wrote the original software. If you use this software
  * in a product, an acknowledgment in the product documentation would be
@@ -25,8 +25,8 @@ using namespace std;
 
 namespace toolkit {
 
-template<>
-mINI_basic<string, variant> &mINI_basic<string, variant>::Instance(){
+template <>
+mINI_basic<string, variant> &mINI_basic<string, variant>::Instance() {
     static mINI_basic<string, variant> instance;
     return instance;
 }
@@ -35,7 +35,7 @@ template <>
 bool variant::as<bool>() const {
     if (empty() || isdigit(front())) {
         //数字开头  [AUTO-TRANSLATED:e4266329]
-        //Starts with a number
+        // Starts with a number
         return as_default<bool>();
     }
     if (strToLower(std::string(*this)) == "true") {
@@ -45,15 +45,13 @@ bool variant::as<bool>() const {
         return false;
     }
     //未识别字符串  [AUTO-TRANSLATED:b8037f51]
-    //Unrecognized string
+    // Unrecognized string
     return as_default<bool>();
 }
 
-template<>
+template <>
 uint8_t variant::as<uint8_t>() const {
     return 0xFF & as_default<int>();
 }
 
 }  // namespace toolkit
-
-

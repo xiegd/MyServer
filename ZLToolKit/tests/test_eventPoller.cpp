@@ -10,10 +10,11 @@
 
 #include <csignal>
 #include <iostream>
-#include "Util/util.h"
-#include "Util/logger.h"
-#include "Util/TimeTicker.h"
+
 #include "Poller/EventPoller.h"
+#include "Util/TimeTicker.h"
+#include "Util/logger.h"
+#include "Util/util.h"
 
 using namespace std;
 using namespace toolkit;
@@ -23,40 +24,40 @@ using namespace toolkit;
  * @return
  * CPU load balancing test
  * @return
- 
+
  * [AUTO-TRANSLATED:620fe7ab]
  */
 int main() {
-    static bool  exit_flag = false;
+    static bool exit_flag = false;
     signal(SIGINT, [](int) { exit_flag = true; });
     //设置日志  [AUTO-TRANSLATED:50372045]
     // Set log
     Logger::Instance().add(std::make_shared<ConsoleChannel>());
 
     Ticker ticker;
-    while(!exit_flag){
-
-        if(ticker.elapsedTime() > 1000){
+    while (!exit_flag) {
+        if (ticker.elapsedTime() > 1000) {
             auto vec = EventPollerPool::Instance().getExecutorLoad();
             _StrPrinter printer;
-            for(auto load : vec){
+            for (auto load : vec) {
                 printer << load << "-";
             }
             DebugL << "cpu负载:" << printer;
 
-            EventPollerPool::Instance().getExecutorDelay([](const vector<int> &vec){
-                _StrPrinter printer;
-                for(auto delay : vec){
-                    printer << delay << "-";
-                }
-                DebugL << "cpu任务执行延时:" << printer;
-            });
+            EventPollerPool::Instance().getExecutorDelay(
+                [](const vector<int> &vec) {
+                    _StrPrinter printer;
+                    for (auto delay : vec) {
+                        printer << delay << "-";
+                    }
+                    DebugL << "cpu任务执行延时:" << printer;
+                });
             ticker.resetTime();
         }
 
-        EventPollerPool::Instance().getExecutor()->async([](){
+        EventPollerPool::Instance().getExecutor()->async([]() {
             auto usec = rand() % 4000;
-            //DebugL << usec;
+            // DebugL << usec;
             usleep(usec);
         });
 

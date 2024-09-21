@@ -47,8 +47,8 @@
  * used to check if daylight saving time is currently in effect. The caller
  * of this function should obtain such information calling tzset() ASAP in the
  * main() function to obtain the timezone offset from the 'timezone' global
- * variable. To obtain the daylight information, if it is currently active or not,
- * one trick is to call localtime() in main() ASAP as well, and get the
+ * variable. To obtain the daylight information, if it is currently active or
+ * not, one trick is to call localtime() in main() ASAP as well, and get the
  * information from the tm_isdst field of the tm structure. However the daylight
  * time may switch in the future for long running processes, so this information
  * should be refreshed at safe times.
@@ -60,9 +60,7 @@ namespace toolkit {
 static int _daylight_active;
 static long _current_timezone;
 
-int get_daylight_active() {
-    return _daylight_active;
-}
+int get_daylight_active() { return _daylight_active; }
 
 static int is_leap_year(time_t year) {
     if (year % 4)
@@ -80,10 +78,10 @@ void no_locks_localtime(struct tm *tmp, time_t t) {
     const time_t secs_hour = 3600;
     const time_t secs_day = 3600 * 24;
 
-    t -= _current_timezone; /* Adjust for timezone. */
+    t -= _current_timezone;            /* Adjust for timezone. */
     t += 3600 * get_daylight_active(); /* Adjust for daylight time. */
-    time_t days = t / secs_day; /* Days passed since epoch. */
-    time_t seconds = t % secs_day; /* Remaining seconds. */
+    time_t days = t / secs_day;        /* Days passed since epoch. */
+    time_t seconds = t % secs_day;     /* Remaining seconds. */
 
     tmp->tm_isdst = get_daylight_active();
     tmp->tm_hour = seconds / secs_hour;
@@ -102,8 +100,7 @@ void no_locks_localtime(struct tm *tmp, time_t t) {
     while (1) {
         /* Leap years have one day more. */
         time_t days_this_year = 365 + is_leap_year(tmp->tm_year);
-        if (days_this_year > days)
-            break;
+        if (days_this_year > days) break;
         days -= days_this_year;
         tmp->tm_year++;
     }
@@ -112,7 +109,7 @@ void no_locks_localtime(struct tm *tmp, time_t t) {
     /* We need to calculate in which month and day of the month we are. To do
      * so we need to skip days according to how many days there are in each
      * month, and adjust for the leap year that has one more day in February. */
-    int mdays[12] = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
+    int mdays[12] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
     mdays[1] += is_leap_year(tmp->tm_year);
 
     tmp->tm_mon = 0;
@@ -122,43 +119,42 @@ void no_locks_localtime(struct tm *tmp, time_t t) {
     }
 
     tmp->tm_mday = days + 1; /* Add 1 since our 'days' is zero-based. */
-    tmp->tm_year -= 1900; /* Surprisingly tm_year is year-1900. */
+    tmp->tm_year -= 1900;    /* Surprisingly tm_year is year-1900. */
 }
 
 void local_time_init() {
     /* Obtain timezone and daylight info. */
     tzset(); /* Now 'timezome' global is populated. */
 #if defined(__linux__) || defined(__sun)
-    _current_timezone  = timezone;
+    _current_timezone = timezone;
 #elif defined(_WIN32)
-	time_t time_utc;
-	struct tm tm_local;
+    time_t time_utc;
+    struct tm tm_local;
 
-	// Get the UTC time
-	time(&time_utc);
+    // Get the UTC time
+    time(&time_utc);
 
-	// Get the local time
-	// Use localtime_r for threads safe for linux
-	//localtime_r(&time_utc, &tm_local);
-	localtime_s(&tm_local, &time_utc);
+    // Get the local time
+    // Use localtime_r for threads safe for linux
+    // localtime_r(&time_utc, &tm_local);
+    localtime_s(&tm_local, &time_utc);
 
-	time_t time_local;
-	struct tm tm_gmt;
+    time_t time_local;
+    struct tm tm_gmt;
 
-	// Change tm to time_t
-	time_local = mktime(&tm_local);
+    // Change tm to time_t
+    time_local = mktime(&tm_local);
 
-	// Change it to GMT tm
-	//gmtime_r(&time_utc, &tm_gmt);//linux
-	gmtime_s(&tm_gmt, &time_utc);
+    // Change it to GMT tm
+    // gmtime_r(&time_utc, &tm_gmt);//linux
+    gmtime_s(&tm_gmt, &time_utc);
 
-	int time_zone = tm_local.tm_hour - tm_gmt.tm_hour;
-	if (time_zone < -12) {
-		time_zone += 24;
-	}
-	else if (time_zone > 12) {
-		time_zone -= 24;
-	}
+    int time_zone = tm_local.tm_hour - tm_gmt.tm_hour;
+    if (time_zone < -12) {
+        time_zone += 24;
+    } else if (time_zone > 12) {
+        time_zone -= 24;
+    }
 
     _current_timezone = time_zone;
 #else
@@ -171,4 +167,4 @@ void local_time_init() {
     struct tm *aux = localtime(&t);
     _daylight_active = aux->tm_isdst;
 }
-} // namespace toolkit
+}  // namespace toolkit

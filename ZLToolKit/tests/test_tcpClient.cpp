@@ -10,57 +10,53 @@
 
 #include <csignal>
 #include <iostream>
-#include "Util/logger.h"
+
 #include "Network/TcpClient.h"
+#include "Util/logger.h"
 using namespace std;
 using namespace toolkit;
 
-class TestClient: public TcpClient {
-public:
+class TestClient : public TcpClient {
+   public:
     using Ptr = std::shared_ptr<TestClient>;
-    TestClient():TcpClient() {
-        DebugL;
-    }
-    ~TestClient(){
-        DebugL;
-    }
-protected:
-    virtual void onConnect(const SockException &ex) override{
+    TestClient() : TcpClient() { DebugL; }
+    ~TestClient() { DebugL; }
+
+   protected:
+    virtual void onConnect(const SockException &ex) override {
         //连接结果事件  [AUTO-TRANSLATED:46887902]
         // Connection established event
-        InfoL << (ex ?  ex.what() : "success");
+        InfoL << (ex ? ex.what() : "success");
     }
-    virtual void onRecv(const Buffer::Ptr &pBuf) override{
+    virtual void onRecv(const Buffer::Ptr &pBuf) override {
         //接收数据事件  [AUTO-TRANSLATED:397ef7e4]
         // Data received event
         DebugL << pBuf->data() << " from port:" << get_peer_port();
     }
-    virtual void onFlush() override{
+    virtual void onFlush() override {
         //发送阻塞后，缓存清空事件  [AUTO-TRANSLATED:46e8bca0]
         // Send blocked, cache cleared event
         DebugL;
     }
-    virtual void onError(const SockException &ex) override{
+    virtual void onError(const SockException &ex) override {
         //断开连接事件，一般是EOF  [AUTO-TRANSLATED:7359fecf]
         // Disconnected event, usually EOF
         WarnL << ex.what();
     }
-    virtual void onManager() override{
+    virtual void onManager() override {
         //定时发送数据到服务器  [AUTO-TRANSLATED:688c9148]
         // Periodically send data to the server
         auto buf = BufferRaw::create();
-        if(buf){
+        if (buf) {
             buf->assign("[BufferRaw]\0");
-            (*this) << _nTick++ << " "
-                    << 3.14 << " "
-                    << string("string") << " "
-                    <<(Buffer::Ptr &)buf;
+            (*this) << _nTick++ << " " << 3.14 << " " << string("string") << " "
+                    << (Buffer::Ptr &)buf;
         }
     }
-private:
+
+   private:
     int _nTick = 0;
 };
-
 
 int main() {
     // 设置日志系统  [AUTO-TRANSLATED:45646031]
@@ -68,16 +64,17 @@ int main() {
     Logger::Instance().add(std::make_shared<ConsoleChannel>());
     Logger::Instance().setWriter(std::make_shared<AsyncLogWriter>());
 
-    TestClient::Ptr client(new TestClient());//必须使用智能指针
-    client->startConnect("127.0.0.1",9000);//连接服务器
+    TestClient::Ptr client(new TestClient());  //必须使用智能指针
+    client->startConnect("127.0.0.1", 9000);   //连接服务器
 
-    TcpClientWithSSL<TestClient>::Ptr clientSSL(new TcpClientWithSSL<TestClient>());//必须使用智能指针
-    clientSSL->startConnect("127.0.0.1",9001);//连接服务器
+    TcpClientWithSSL<TestClient>::Ptr clientSSL(
+        new TcpClientWithSSL<TestClient>());     //必须使用智能指针
+    clientSSL->startConnect("127.0.0.1", 9001);  //连接服务器
 
     //退出程序事件处理  [AUTO-TRANSLATED:80065cb7]
     // Exit program event handling
     static semaphore sem;
-    signal(SIGINT, [](int) { sem.post(); });// 设置退出信号
+    signal(SIGINT, [](int) { sem.post(); });  // 设置退出信号
     sem.wait();
     return 0;
 }

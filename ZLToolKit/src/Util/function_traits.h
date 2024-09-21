@@ -1,47 +1,49 @@
 ﻿#ifndef SRC_UTIL_FUNCTION_TRAITS_H_
 #define SRC_UTIL_FUNCTION_TRAITS_H_
 
-#include <tuple>
 #include <functional>
+#include <tuple>
 
 namespace toolkit {
 
-template<typename T>
+template <typename T>
 struct function_traits;
 
 //普通函数  [AUTO-TRANSLATED:569a9de3]
-//Ordinary function
-template<typename Ret, typename... Args>
-struct function_traits<Ret(Args...)>
-{
-public:
+// Ordinary function
+template <typename Ret, typename... Args>
+struct function_traits<Ret(Args...)> {
+   public:
     enum { arity = sizeof...(Args) };
     typedef Ret function_type(Args...);
     typedef Ret return_type;
     using stl_function_type = std::function<function_type>;
-    typedef Ret(*pointer)(Args...);
+    typedef Ret (*pointer)(Args...);
 
-    template<size_t I>
-    struct args
-    {
-        static_assert(I < arity, "index is out of range, index must less than sizeof Args");
-        using type = typename std::tuple_element<I, std::tuple<Args...> >::type;
+    template <size_t I>
+    struct args {
+        static_assert(
+            I < arity,
+            "index is out of range, index must less than sizeof Args");
+        using type = typename std::tuple_element<I, std::tuple<Args...>>::type;
     };
 };
 
 //函数指针  [AUTO-TRANSLATED:bc15033e]
-//Function pointer
-template<typename Ret, typename... Args>
-struct function_traits<Ret(*)(Args...)> : function_traits<Ret(Args...)>{};
-
-//std::function
+// Function pointer
 template <typename Ret, typename... Args>
-struct function_traits<std::function<Ret(Args...)>> : function_traits<Ret(Args...)>{};
+struct function_traits<Ret (*)(Args...)> : function_traits<Ret(Args...)> {};
 
-//member function
-#define FUNCTION_TRAITS(...) \
-    template <typename ReturnType, typename ClassType, typename... Args>\
-    struct function_traits<ReturnType(ClassType::*)(Args...) __VA_ARGS__> : function_traits<ReturnType(Args...)>{}; \
+// std::function
+template <typename Ret, typename... Args>
+struct function_traits<std::function<Ret(Args...)>>
+    : function_traits<Ret(Args...)> {};
+
+// member function
+#define FUNCTION_TRAITS(...)                                               \
+    template <typename ReturnType, typename ClassType, typename... Args>   \
+    struct function_traits<ReturnType (ClassType::*)(Args...) __VA_ARGS__> \
+        : function_traits<ReturnType(Args...)> {};
 
 FUNCTION_TRAITS()
 FUNCTION_TRAITS(const)
@@ -49,9 +51,9 @@ FUNCTION_TRAITS(volatile)
 FUNCTION_TRAITS(const volatile)
 
 //函数对象  [AUTO-TRANSLATED:a0091563]
-//Function object
-template<typename Callable>
-struct function_traits : function_traits<decltype(&Callable::operator())>{};
+// Function object
+template <typename Callable>
+struct function_traits : function_traits<decltype(&Callable::operator())> {};
 
 } /* namespace toolkit */
 

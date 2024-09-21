@@ -11,16 +11,16 @@
 #ifndef THREADPOOL_H_
 #define THREADPOOL_H_
 
-#include "threadgroup.h"
-#include "TaskQueue.h"
 #include "TaskExecutor.h"
-#include "Util/util.h"
+#include "TaskQueue.h"
 #include "Util/logger.h"
+#include "Util/util.h"
+#include "threadgroup.h"
 
 namespace toolkit {
 
 class ThreadPool : public TaskExecutor {
-public:
+   public:
     enum Priority {
         PRIORITY_LOWEST = 0,
         PRIORITY_LOW,
@@ -29,7 +29,8 @@ public:
         PRIORITY_HIGHEST
     };
 
-    ThreadPool(int num = 1, Priority priority = PRIORITY_HIGHEST, bool auto_run = true, bool set_affinity = true,
+    ThreadPool(int num = 1, Priority priority = PRIORITY_HIGHEST,
+               bool auto_run = true, bool set_affinity = true,
                const std::string &pool_name = "thread pool") {
         _thread_num = num;
         _on_setup = [pool_name, priority, set_affinity](int index) {
@@ -52,7 +53,7 @@ public:
     }
 
     //把任务打入线程池并异步执行  [AUTO-TRANSLATED:651c8d5a]
-    //Put the task into the thread pool and execute it asynchronously
+    // Put the task into the thread pool and execute it asynchronously
     Task::Ptr async(TaskIn task, bool may_sync = true) override {
         if (may_sync && _thread_group.is_this_thread_in()) {
             task();
@@ -74,15 +75,18 @@ public:
         return ret;
     }
 
-    size_t size() {
-        return _queue.size();
-    }
+    size_t size() { return _queue.size(); }
 
-    static bool setPriority(Priority priority = PRIORITY_NORMAL, std::thread::native_handle_type threadId = 0) {
+    static bool setPriority(Priority priority = PRIORITY_NORMAL,
+                            std::thread::native_handle_type threadId = 0) {
         // set priority
 #if defined(_WIN32)
-        static int Priorities[] = { THREAD_PRIORITY_LOWEST, THREAD_PRIORITY_BELOW_NORMAL, THREAD_PRIORITY_NORMAL, THREAD_PRIORITY_ABOVE_NORMAL, THREAD_PRIORITY_HIGHEST };
-        if (priority != PRIORITY_NORMAL && SetThreadPriority(GetCurrentThread(), Priorities[priority]) == 0) {
+        static int Priorities[] = {
+            THREAD_PRIORITY_LOWEST, THREAD_PRIORITY_BELOW_NORMAL,
+            THREAD_PRIORITY_NORMAL, THREAD_PRIORITY_ABOVE_NORMAL,
+            THREAD_PRIORITY_HIGHEST};
+        if (priority != PRIORITY_NORMAL &&
+            SetThreadPriority(GetCurrentThread(), Priorities[priority]) == 0) {
             return false;
         }
         return true;
@@ -95,7 +99,9 @@ public:
         if (Max == -1) {
             return false;
         }
-        static int Priorities[] = {Min, Min + (Max - Min) / 4, Min + (Max - Min) / 2, Min + (Max - Min) * 3 / 4, Max};
+        static int Priorities[] = {Min, Min + (Max - Min) / 4,
+                                   Min + (Max - Min) / 2,
+                                   Min + (Max - Min) * 3 / 4, Max};
 
         if (threadId == 0) {
             threadId = pthread_self();
@@ -112,11 +118,11 @@ public:
         }
         size_t total = _thread_num - _thread_group.size();
         for (size_t i = 0; i < total; ++i) {
-            _thread_group.create_thread([this, i]() {run(i);});
+            _thread_group.create_thread([this, i]() { run(i); });
         }
     }
 
-private:
+   private:
     void run(size_t index) {
         _on_setup(index);
         Task::Ptr task;
@@ -124,7 +130,7 @@ private:
             startSleep();
             if (!_queue.get_task(task)) {
                 //空任务，退出线程  [AUTO-TRANSLATED:583e2f11]
-                //Empty task, exit the thread
+                // Empty task, exit the thread
                 break;
             }
             sleepWakeUp();
@@ -137,15 +143,11 @@ private:
         }
     }
 
-    void wait() {
-        _thread_group.join_all();
-    }
+    void wait() { _thread_group.join_all(); }
 
-    void shutdown() {
-        _queue.push_exit(_thread_num);
-    }
+    void shutdown() { _queue.push_exit(_thread_num); }
 
-private:
+   private:
     size_t _thread_num;
     Logger::Ptr _logger;
     thread_group _thread_group;

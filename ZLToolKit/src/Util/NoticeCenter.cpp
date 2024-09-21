@@ -8,12 +8,12 @@
  * may be found in the AUTHORS file in the root of the source tree.
  */
 
-#include "util.h"
 #include "NoticeCenter.h"
+
+#include "util.h"
 
 namespace toolkit {
 
 INSTANCE_IMP(NoticeCenter)
 
 } /* namespace toolkit */
-

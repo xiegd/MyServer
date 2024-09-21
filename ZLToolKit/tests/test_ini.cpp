@@ -9,6 +9,7 @@
  */
 
 #include <iostream>
+
 #include "Util/logger.h"
 #include "Util/mini.h"
 using namespace std;
@@ -17,7 +18,7 @@ using namespace toolkit;
 int main() {
     //初始化日志系统  [AUTO-TRANSLATED:25c549de]
     // Initialize the logging system
-    Logger::Instance().add(std::make_shared<ConsoleChannel> ());
+    Logger::Instance().add(std::make_shared<ConsoleChannel>());
     Logger::Instance().setWriter(std::make_shared<AsyncLogWriter>());
     mINI ini;
     ini[".dot"] = "dot-value";
@@ -38,7 +39,7 @@ int main() {
 
     ini.clear();
     ini.parse(str);
-    for (auto &pr: ini) {
+    for (auto &pr : ini) {
         DebugL << pr.first << " = " << pr.second;
     }
 
@@ -58,7 +59,7 @@ int main() {
     )";
     ini.clear();
     ini.parse(ini_str);
-    for (auto &pr: ini) {
+    for (auto &pr : ini) {
         TraceL << pr.first << " = " << pr.second;
     }
 

@@ -14,7 +14,7 @@
 namespace toolkit {
 
 class PipeWrap {
-public:
+   public:
     PipeWrap();
     ~PipeWrap();
     int write(const void *buf, int n);
@@ -23,13 +23,12 @@ public:
     int writeFD() const { return _pipe_fd[1]; }
     void reOpen();
 
-private:
+   private:
     void clearFD();
 
-private:
-    int _pipe_fd[2] = { -1, -1 };
+   private:
+    int _pipe_fd[2] = {-1, -1};
 };
 
 } /* namespace toolkit */
-#endif // !PipeWarp_h
-
+#endif  // !PipeWarp_h

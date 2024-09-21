@@ -9,10 +9,11 @@
  */
 
 #include <chrono>
+
+#include "Thread/ThreadPool.h"
+#include "Util/TimeTicker.h"
 #include "Util/logger.h"
 #include "Util/onceToken.h"
-#include "Util/TimeTicker.h"
-#include "Thread/ThreadPool.h"
 
 using namespace std;
 using namespace toolkit;
@@ -23,13 +24,15 @@ int main() {
     Logger::Instance().add(std::make_shared<ConsoleChannel>());
     Logger::Instance().setWriter(std::make_shared<AsyncLogWriter>());
 
-    ThreadPool pool(thread::hardware_concurrency(), ThreadPool::PRIORITY_HIGHEST, true);
+    ThreadPool pool(thread::hardware_concurrency(),
+                    ThreadPool::PRIORITY_HIGHEST, true);
 
     //每个任务耗时3秒  [AUTO-TRANSLATED:c1b83e8e]
     // Each task takes 3 seconds
     auto task_second = 3;
     //每个线程平均执行4次任务，总耗时应该为12秒  [AUTO-TRANSLATED:ceab38cc]
-    // Each thread executes 4 tasks on average, the total time should be 12 seconds
+    // Each thread executes 4 tasks on average, the total time should be 12
+    // seconds
     auto task_count = thread::hardware_concurrency() * 4;
 
     semaphore sem;
@@ -39,14 +42,14 @@ int main() {
     {
         //放在作用域中确保token引用次数减1  [AUTO-TRANSLATED:a81d2393]
         // Put it in a scope to ensure the token reference count is decremented
-        auto token = std::make_shared<onceToken>(nullptr, [&]() {
-            sem.post();
-        });
+        auto token =
+            std::make_shared<onceToken>(nullptr, [&]() { sem.post(); });
 
         for (auto i = 0; i < task_count; ++i) {
             pool.async([token, i, task_second, &vec]() {
                 setThreadName(("thread pool " + to_string(i)).data());
-                std::this_thread::sleep_for(std::chrono::seconds(task_second)); //休眠三秒
+                std::this_thread::sleep_for(
+                    std::chrono::seconds(task_second));  //休眠三秒
                 InfoL << "task " << i << " done!";
                 vec[i] = i;
             });

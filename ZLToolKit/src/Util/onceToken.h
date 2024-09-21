@@ -1,12 +1,12 @@
 ﻿/*
-* Copyright (c) 2016 The ZLToolKit project authors. All Rights Reserved.
-*
-* This file is part of ZLToolKit(https://github.com/ZLMediaKit/ZLToolKit).
-*
-* Use of this source code is governed by MIT license that can be found in the
-* LICENSE file in the root of the source tree. All contributing project authors
-* may be found in the AUTHORS file in the root of the source tree.
-*/
+ * Copyright (c) 2016 The ZLToolKit project authors. All Rights Reserved.
+ *
+ * This file is part of ZLToolKit(https://github.com/ZLMediaKit/ZLToolKit).
+ *
+ * Use of this source code is governed by MIT license that can be found in the
+ * LICENSE file in the root of the source tree. All contributing project authors
+ * may be found in the AUTHORS file in the root of the source tree.
+ */
 
 #ifndef UTIL_ONCETOKEN_H_
 #define UTIL_ONCETOKEN_H_
@@ -17,10 +17,10 @@
 namespace toolkit {
 
 class onceToken {
-public:
+   public:
     using task = std::function<void(void)>;
 
-    template<typename FUNC>
+    template <typename FUNC>
     onceToken(const FUNC &onConstructed, task onDestructed = nullptr) {
         onConstructed();
         _onDestructed = std::move(onDestructed);
@@ -36,14 +36,14 @@ public:
         }
     }
 
-private:
+   private:
     onceToken() = delete;
     onceToken(const onceToken &) = delete;
     onceToken(onceToken &&) = delete;
     onceToken &operator=(const onceToken &) = delete;
     onceToken &operator=(onceToken &&) = delete;
 
-private:
+   private:
     task _onDestructed;
 };
 

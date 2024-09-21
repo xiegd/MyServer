@@ -9,16 +9,17 @@
  */
 
 #include <iostream>
+
+#include "Util/SSLBox.h"
 #include "Util/logger.h"
 #include "Util/util.h"
-#include "Util/SSLBox.h"
 using namespace std;
 using namespace toolkit;
 
-int main(int argc,char *argv[]) {
+int main(int argc, char *argv[]) {
     //初始化设置日志  [AUTO-TRANSLATED:f8d72b7b]
     // Initialize log settings
-    Logger::Instance().add(std::make_shared<ConsoleChannel> ());
+    Logger::Instance().add(std::make_shared<ConsoleChannel>());
     Logger::Instance().setWriter(std::make_shared<AsyncLogWriter>());
 
     //加载证书，证书包含公钥和私钥  [AUTO-TRANSLATED:fce78641]
