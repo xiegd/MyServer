@@ -1,2 +1,5 @@
 /build
 /CMakeFiles
+/ZLToolKit/bin
+/ZLToolKit/CMakeFiles
+/ZLToolKit/lib
