@@ -21,65 +21,46 @@
 namespace toolkit {
 
 /**
-* cpu负载计算器
- * CPU Load Calculator
-
- * [AUTO-TRANSLATED:46dad663]
-*/
+ * @class ThreadLoadCounter
+ * @brief CPU负载计算器
+ * 
+ * 用于计算和跟踪线程的CPU使用率。
+ */
 class ThreadLoadCounter {
-   public:
+public:
     /**
-     * 构造函数
+     * @brief 构造函数
      * @param max_size 统计样本数量
-     * @param max_usec 统计时间窗口,亦即最近{max_usec}的cpu负载率
-     * Constructor
-     * @param max_size Number of statistical samples
-     * @param max_usec Statistical time window, i.e., the CPU load rate for the
-     most recent {max_usec}
-
-     * [AUTO-TRANSLATED:718cb173]
+     * @param max_usec 统计时间窗口大小（微秒）
      */
     ThreadLoadCounter(uint64_t max_size, uint64_t max_usec);
     ~ThreadLoadCounter() = default;
 
     /**
-     * 线程进入休眠
-     * Thread enters sleep
-
-     * [AUTO-TRANSLATED:d831fad1]
+     * @brief 线程进入休眠状态
      */
     void startSleep();
 
     /**
-     * 休眠唤醒,结束休眠
-     * Wake up from sleep, end sleep
-
-     * [AUTO-TRANSLATED:361831f8]
+     * @brief 线程从休眠状态唤醒
      */
     void sleepWakeUp();
 
     /**
-     * 返回当前线程cpu使用率，范围为 0 ~ 100
-     * @return 当前线程cpu使用率
-     * Returns the current thread's CPU usage rate, ranging from 0 to 100
-     * @return Current thread's CPU usage rate
-
-     * [AUTO-TRANSLATED:c9953342]
+     * @brief 获取当前线程的CPU使用率
+     * @return CPU使用率，范围为0~100
      */
     int load();
 
-   private:
+private:
+    // 内部使用的时间记录结构
     struct TimeRecord {
-        TimeRecord(uint64_t tm, bool slp) {
-            _time = tm;
-            _sleep = slp;
-        }
-
+        TimeRecord(uint64_t tm, bool slp) : _time(tm), _sleep(slp) {}
         bool _sleep;
         uint64_t _time;
     };
 
-   private:
+private:
     bool _sleeping = true;
     uint64_t _last_sleep_time;
     uint64_t _last_wake_time;
@@ -89,36 +70,69 @@ class ThreadLoadCounter {
     List<TimeRecord> _time_list;
 };
 
+/**
+ * @class TaskCancelable
+ * @brief 可取消任务的基类
+ */
 class TaskCancelable : public noncopyable {
-   public:
+public:
     TaskCancelable() = default;
     virtual ~TaskCancelable() = default;
+    
+    /**
+     * @brief 取消任务
+     */
     virtual void cancel() = 0;
 };
 
+/**
+ * @class TaskCancelableImp
+ * @brief 可取消任务的实现类
+ * 
+ * @tparam R 任务返回值类型
+ * @tparam ArgTypes 任务参数类型
+ */
 template <class R, class... ArgTypes>
 class TaskCancelableImp;
 
 template <class R, class... ArgTypes>
 class TaskCancelableImp<R(ArgTypes...)> : public TaskCancelable {
-   public:
+public:
     using Ptr = std::shared_ptr<TaskCancelableImp>;
     using func_type = std::function<R(ArgTypes...)>;
 
     ~TaskCancelableImp() = default;
 
+    /**
+     * @brief 构造函数
+     * @param task 要执行的任务
+     */
     template <typename FUNC>
     TaskCancelableImp(FUNC &&task) {
         _strongTask = std::make_shared<func_type>(std::forward<FUNC>(task));
         _weakTask = _strongTask;
     }
 
+    /**
+     * @brief 取消任务
+     */
     void cancel() override { _strongTask = nullptr; }
 
+    /**
+     * @brief 检查任务是否有效
+     */
     operator bool() { return _strongTask && *_strongTask; }
 
+    /**
+     * @brief 将任务设置为空
+     */
     void operator=(std::nullptr_t) { _strongTask = nullptr; }
 
+    /**
+     * @brief 执行任务
+     * @param args 任务参数
+     * @return 任务执行结果
+     */
     R operator()(ArgTypes... args) const {
         auto strongTask = _weakTask.lock();
         if (strongTask && *strongTask) {
@@ -127,23 +141,32 @@ class TaskCancelableImp<R(ArgTypes...)> : public TaskCancelable {
         return defaultValue<R>();
     }
 
+    /**
+     * @brief 获取void类型的默认值
+     */
     template <typename T>
     static typename std::enable_if<std::is_void<T>::value, void>::type
     defaultValue() {}
 
+    /**
+     * @brief 获取指针类型的默认值
+     */
     template <typename T>
     static typename std::enable_if<std::is_pointer<T>::value, T>::type
     defaultValue() {
         return nullptr;
     }
 
+    /**
+     * @brief 获取整型的默认值
+     */
     template <typename T>
     static typename std::enable_if<std::is_integral<T>::value, T>::type
     defaultValue() {
         return 0;
     }
 
-   protected:
+protected:
     std::weak_ptr<func_type> _weakTask;
     std::shared_ptr<func_type> _strongTask;
 };
@@ -151,218 +174,138 @@ class TaskCancelableImp<R(ArgTypes...)> : public TaskCancelable {
 using TaskIn = std::function<void()>;
 using Task = TaskCancelableImp<void()>;
 
+/**
+ * @class TaskExecutorInterface
+ * @brief 任务执行器接口
+ */
 class TaskExecutorInterface {
-   public:
+public:
     TaskExecutorInterface() = default;
     virtual ~TaskExecutorInterface() = default;
 
     /**
-     * 异步执行任务
-     * @param task 任务
-     * @param may_sync 是否允许同步执行该任务
+     * @brief 异步执行任务
+     * @param task 要执行的任务
+     * @param may_sync 是否允许同步执行
      * @return 任务是否添加成功
-     * Asynchronously execute a task
-     * @param task Task
-     * @param may_sync Whether to allow synchronous execution of the task
-     * @return Whether the task was added successfully
-
-     * [AUTO-TRANSLATED:271d48a2]
      */
     virtual Task::Ptr async(TaskIn task, bool may_sync = true) = 0;
 
     /**
-     * 最高优先级方式异步执行任务
-     * @param task 任务
-     * @param may_sync 是否允许同步执行该任务
+     * @brief 以最高优先级异步执行任务
+     * @param task 要执行的任务
+     * @param may_sync 是否允许同步执行
      * @return 任务是否添加成功
-     * Asynchronously execute a task with the highest priority
-     * @param task Task
-     * @param may_sync Whether to allow synchronous execution of the task
-     * @return Whether the task was added successfully
-
-     * [AUTO-TRANSLATED:d52ce80b]
      */
     virtual Task::Ptr async_first(TaskIn task, bool may_sync = true);
 
     /**
-     * 同步执行任务
-     * @param task
-     * @return
-     * Synchronously execute a task
-     * @param task
-     * @return
-
-     * [AUTO-TRANSLATED:24854b4a]
+     * @brief 同步执行任务
+     * @param task 要执行的任务
      */
     void sync(const TaskIn &task);
 
     /**
-     * 最高优先级方式同步执行任务
-     * @param task
-     * @return
-     * Synchronously execute a task with the highest priority
-     * @param task
-     * @return
-
-     * [AUTO-TRANSLATED:3d15452d]
+     * @brief 以最高优先级同步执行任务
+     * @param task 要执行的任务
      */
     void sync_first(const TaskIn &task);
 };
 
 /**
-* 任务执行器
- * Task Executor
-
- * [AUTO-TRANSLATED:630c364f]
-*/
+ * @class TaskExecutor
+ * @brief 任务执行器
+ */
 class TaskExecutor : public ThreadLoadCounter, public TaskExecutorInterface {
-   public:
+public:
     using Ptr = std::shared_ptr<TaskExecutor>;
 
     /**
-     * 构造函数
-     * @param max_size cpu负载统计样本数
-     * @param max_usec cpu负载统计时间窗口大小
-     fade fade оч fadeSalvar :::.Enums fade fade fade fade оч fade fade fade
-     fade ::: fade fade fade fade fade fade fade fade_Checked fade fade fade
-     fade_TYPEDEF fade fade fade fade fadeSalvar fade fade fade fade.Enums fade
-     fade fade оч fade fade fade_Checked_Checked fade fade fade fade fade fade
-     fade fade fade fade fade fade fade fade fade оч fade fade fade fade
-     fade_Checked fade fade fade fade fade оч fade fade fade fade fade fade fade
-     fade fade_TYPEDEF fade fade_TYPEDEF fade fade fadeSalvar fade fade fade
-     fade fade fade fade fade fade оч fade.Enums fade fade оч fade fade fade
-     fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade
-     fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade
-     fade fade fade fade оч оч fade fade fade fade fade fade.Enums fade fade
-     fade fade fade fade fade fade fade fade fade fade fade fade fade fade
-     fade.Enums fade fade.Enums_Checked_TYPEDEF fade.Enums_CheckedSalvar fade
-     fade fade fade fade fade fade ::: fade.Enums fade fade fade fade fade
-     fade.Enums fade.Enums fade fade fade fade fade fade_Checked fade fade fade
-     fade fade fade fade fade fade fade fade.Enums fade fade fade fade fade fade
-     fade fade fade fade fade fade fade fade fade fade fade.Enums fade fade fade
-     fade fade fade fade fade fade fade fade fade fade оч fade fade оч fade fade
-     fade fade fade fade fade fade оч fade fade fade fade fade fade fade fade
-     fade fade fade fade fade fade fade fade fade fadeSalvar fade fade fade fade
-     fade fade fade fade fade fade fade fade fade.Enums fade fade fade fade fade
-     fade fade fade оч оч fade fade.Enums fade fade ::: fade fade fade fade fade
-     fade оч fade_Checked fade fade fade fade fade fade fade.Enums fade fade
-     fade fade fade fade_Checked fade fade fade fade fade fade оч fade fade fade
-     fade fade fade fade fade fade fade fade fade fade fade fade ::: fade fade
-     fade fade fade fade fade fade fade fade fade оч fade_Checked AsyncStorage
-     fade fade fade fade fade fade fade fade fade fade fade fade fade fade
-     fade_Checked fade fade fade fade fade fade fade fade fade fade fade fade
-     fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade
-     fade fade fade fade fade fade fade fade fade_Checked fade.Enums fade fade
-     fade fade fade fade fade fade fade fadeSalvar fade fade fade fade fade fade
-     fade fade fade fade fade fade fade fade fade fade.Enums_TYPEDEF fade fade
-     fade fade fade fade fade fade fade fade оч fade fade fade fade fade fade
-     fade fade fade fade fade fade fade fade fade оч fade fade fade fade fade
-     fade fade fade fade fade fade fade fade.Enums ::: fade fade fade fade fade
-     fade fade.Enums fade fade fade fade fade fadeSalvar оч fade fade fade fade
-     fade fade fade fade fade fade fade fade fade fade fade fadeSalvar fade fade
-     fade fade fadeSalvar fade fade fade fade fade fade fade fade fade fade оч
-     fade fade Bai.Enums fade fade fade fade fade fade fade fade fade fade.Enums
-     fade fade fade очSalvar fade fade fade fade fade fade fade_Checked fade
-     fade fade fade fade fade fade оч fade fade fade fade fade fade fade fade
-     :::_Checked ::: fade fade fade fade fade fade fade fade Bai fade fade оч
-     fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade
-     fade fade fade fade fade fade fade fadeSalvar fade fade fade fade fade fade
-     fade fade fadeSalvar fade fade fade fade fade fade fade.Enums fade fade
-     fade fade fade fade fade fade ::: fade_Checked fade fade fade fade fade
-     fade fade fade fade fade fade.Enums fade fade fade fade fade fade fade fade
-     fade fade fade.Enums fade fade оч fade.Enums fade оч fade fade fade fade
-     fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade
-     fade fade оч.Enums ::: fade fade fade fade fade fade fade fade fade.Enums
-     fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade
-     fade fade fade.Enums fade fade fade fade fade fade fade fade fade fade fade
-     fade fade fade fade fade оч fade fade fade fade fade fade fade fade fade
-     fade fade fade fade оч fade fade fade fade fade fade fade fade fade fade
-     fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade
-     fade fade fade fade fade fade fade fade fade fade оч fade fade fade fade
-     fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade
-     fade fade fade оч оч fade fade fade fade fade fade fade fade fade fade fade
-     fade fade fade fade fadeSalvar fade fade fade fade fade fade fade fade fade
-     fade fade fade_TYPEDEF fade оч fade fade fade fade fade fade fade fade fade
-     fade fade fade fade fade fade.Enums fade fade fade fade ::: fade fade fade
-     fade fade fade fade fade fade fade fade fade fade.Enums fade fade fade fade
-     fade fade fade fade fade fade fade fade fade fade fade fade fade fade fade
-     fade fade fade fade fade fade fade fade fade fade fade_TYPEDEF fade fade
-     fade fadeSalvar.Enums fade fade ::: fade fade fade fade оч fade fadeSalvar
-     fade fade fade ::: fade fade fade fade fade fade fade fade fade fade fade
-     fade fade fadedl fade fade fade fade fade fade fade fade fade fade fade
-     fade fade fade fade fade fade fade fade fade fade fade.Enums fade fade fade
-     оч fade fade fade fade fade fade fade fade fade fade fade оч fade fade fade
-     fade fade fade fade fade fade ::: fade fade fade fade fade fade fade fade
-     Bai fade fade fade fade fade fade fade fade fade fade fade fade fade fade
-     fade fade fade fade.Enums fade fade fade fade fade fade fade fade fade fade
-     fadeSalvar fade fade fade fade fade fade fade fade fade fade fade fade fade
-     оч fade fade fade fade fade fade fade fade fade fade fade fade fade_TYPEDEF
-     fade fade fade fade fade оч fade fade fade fade fade fade fade.Enums fade
-     fade fade fade fade fade fade fade fade
-     * [AUTO-TRANSLATED:bd07d170]
+     * @brief 构造函数
+     * @param max_size CPU负载统计样本数
+     * @param max_usec CPU负载统计时间窗口大小
      */
     TaskExecutor(uint64_t max_size = 32, uint64_t max_usec = 2 * 1000 * 1000);
     ~TaskExecutor() = default;
 };
 
+/**
+ * @class TaskExecutorGetter
+ * @brief 任务执行器获取接口
+ */
 class TaskExecutorGetter {
-   public:
+public:
     using Ptr = std::shared_ptr<TaskExecutorGetter>;
 
     virtual ~TaskExecutorGetter() = default;
 
     /**
-     * 获取任务执行器
-     * @return 任务执行器
+     * @brief 获取任务执行器
+     * @return 任务执行器指针
      */
     virtual TaskExecutor::Ptr getExecutor() = 0;
 
     /**
-     * 获取执行器个数
+     * @brief 获取执行器数量
+     * @return 执行器数量
      */
     virtual size_t getExecutorSize() const = 0;
 };
 
+/**
+ * @class TaskExecutorGetterImp
+ * @brief 任务执行器获取接口的实现类
+ */
 class TaskExecutorGetterImp : public TaskExecutorGetter {
-   public:
+public:
     TaskExecutorGetterImp() = default;
     ~TaskExecutorGetterImp() = default;
 
     /**
-     * 根据线程负载情况，获取最空闲的任务执行器
-     * @return 任务执行器
+     * @brief 获取最空闲的任务执行器
+     * @return 任务执行器指针
      */
     TaskExecutor::Ptr getExecutor() override;
 
     /**
-     * 获取所有线程的负载率
-     * @return 所有线程的负载率
+     * @brief 获取所有线程的负载率
+     * @return 负载率列表
      */
     std::vector<int> getExecutorLoad();
 
     /**
-     * 获取所有线程任务执行延时，单位毫秒
-     * 通过此函数也可以大概知道线程负载情况
-     * @return
+     * @brief 获取所有线程任务执行延时
+     * @param callback 回调函数，用于接收延时数据
      */
     void getExecutorDelay(
         const std::function<void(const std::vector<int> &)> &callback);
 
     /**
-     * 遍历所有线程
+     * @brief 遍历所有线程
+     * @param cb 回调函数，用于处理每个执行器
      */
     void for_each(const std::function<void(const TaskExecutor::Ptr &)> &cb);
 
     /**
-     * 获取线程数
+     * @brief 获取线程数
+     * @return 线程数
      */
     size_t getExecutorSize() const override;
 
-   protected:
+protected:
+    /**
+     * @brief 添加一个轮询器
+     * @param name 轮询器名称
+     * @param size 线程池大小
+     * @param priority 优先级
+     * @param register_thread 是否注册线程
+     * @param enable_cpu_affinity 是否启用CPU亲和性
+     * @return 添加的轮询器数量
+     */
     size_t addPoller(const std::string &name, size_t size, int priority,
                      bool register_thread, bool enable_cpu_affinity = true);
 
-   protected:
+protected:
     size_t _thread_pos = 0;
     std::vector<TaskExecutor::Ptr> _threads;
 };
