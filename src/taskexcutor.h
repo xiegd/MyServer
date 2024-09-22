@@ -19,12 +19,21 @@ public:
     virtual void cancel() = 0;
 };
 
-template<class R, class... ArgTypes>
+template<typename R, typename... ArgTypes>
 class TaskCancelableImpl;
-
-
-template<class R, class... ArgTypes>
+ 
+template<typename R, typename... ArgTypes>
+// 类的偏特化, 表示返回值为R, 参数列表为ArgTypes...的函数
+// 即适用于所有函数类型的偏特化
 class TaskCancelableImpl<R(ArgTypes...)> : public TaskCacelable {
+public:
+    using Ptr = std::shared_ptr<TaskCancelableImpl>;
+    using func_type = std::function<R(ArgTypes...)>;
+
+    ~TaskCancelableImpl() = default;
+
+    template<typename FUNC> 
+    
 
 }
 
