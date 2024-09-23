@@ -34,7 +34,11 @@ public:
 
     template<typename FUNC> 
     
+protected:
+    std::weak_ptr<func_type> weakTask_;
+    std::shared_ptr<func_type> strongTask_;
 
-}
+
+};
 
 #endif

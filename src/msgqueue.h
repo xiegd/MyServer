@@ -31,7 +31,7 @@ class MsgQueue {
   // 从队列头部取消息
   bool getMsg(Msg& message) {
     std::unique_lock<std::mutex> lock(get_mutex_);
-    // 非阻塞模式返回nullptr
+    // 非阻塞模式下
     if (Msg_len_ == 0 && nonblock_) {
       return false;  // 没有消息则返回默认构造的Msg
     }
@@ -41,7 +41,10 @@ class MsgQueue {
     }
     message = std::move(msgs_.front());
     msgs_.pop_front();
-    Msg_len_--;
+    {
+      std::lock_guard<decltype(len_mutex_)> lock(len_mutex_);
+      Msg_len_--;
+    }
     // 如果之前队列时满的，则通知生产者，有空间了
     if (Msg_len_ == Msg_max_ - 1) {
       put_cond_.notify_one();
@@ -59,18 +62,24 @@ class MsgQueue {
       return;
     }
     msgs_.emplace_back(std::move(message));
-    Msg_len_++;
+    {
+      std::lock_guard<decltype(len_mutex_)> lock(len_mutex_);
+      Msg_len_++;
+    }
     get_cond_.notify_one();  // 唤醒一个等待读消息的线程
   }
 
   // 向队列头部插入消息
   void putMsgToHead(Msg message) {
-    std::unique_lock<std::mutex> lock(put_mutex_);
+    std::unique_lock<decltype(put_mutex_)> lock(get_mutex_);  // 头插只需要和get操作互斥
     while (Msg_len_ > Msg_max_ && !nonblock_) {
       put_cond_.wait(lock);
     }
     msgs_.emplace_front(std::move(message));
-    Msg_len_++;
+    {
+      std::lock_guard<decltype(len_mutex_)> lock(len_mutex_);
+      Msg_len_++;
+    }
     get_cond_.notify_one();
   }
 
@@ -82,7 +91,9 @@ class MsgQueue {
     put_cond_.notify_all();
     put_mutex_.unlock();
   }
-  size_t size() { return Msg_len_; }
+  size_t size() const{
+    return Msg_len_;
+  }
 
  private:
   size_t Msg_max_;
@@ -91,6 +102,7 @@ class MsgQueue {
   std::deque<Msg> msgs_;
   std::mutex get_mutex_;
   std::mutex put_mutex_;
+  std::mutex len_mutex_;  // 控制对Msg_len_互斥访问
   std::condition_variable get_cond_;
   std::condition_variable put_cond_;
 };
