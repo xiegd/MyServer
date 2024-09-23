@@ -11,6 +11,7 @@
 #include <condition_variable>  // 使用condition_variable代替pthread_cond_t
 #include <deque>
 #include <mutex>  // 使用mutex代替pthread_mutex_t
+#include <optional>
 
 template <typename Msg>
 class MsgQueue {
@@ -18,42 +19,37 @@ class MsgQueue {
   MsgQueue() {
     Msg_max_ = 100;
     nonblock_ = false;
-    msgs_ = new std::deque<Msg*>;
   }
   MsgQueue(size_t maxlen) {
     Msg_max_ = maxlen;
     nonblock_ = false;
-    msgs_ = new std::deque<Msg*>;
   }
 
-  ~MsgQueue() {
-    delete msgs_;
-  }
+  ~MsgQueue() {}
 
  public:
   // 从队列头部取消息
-  Msg* getMsg() {
-    Msg* message = nullptr;
+  bool getMsg(Msg& message) {
     std::unique_lock<std::mutex> lock(get_mutex_);
+    // 非阻塞模式返回nullptr
+    if (Msg_len_ == 0 && nonblock_) {
+      return false;  // 没有消息则返回默认构造的Msg
+    }
     // 阻塞模式下，如果队列中没有消息，则等待
     while (Msg_len_ == 0 && !nonblock_) {
       get_cond_.wait(lock);
     }
-    // 非阻塞模式返回nullptr
-    if (Msg_len_ == 0) {
-      return nullptr;
-    }
-    message = msgs_->front();
-    msgs_->pop_front();
+    message = std::move(msgs_.front());
+    msgs_.pop_front();
     Msg_len_--;
     // 如果之前队列时满的，则通知生产者，有空间了
     if (Msg_len_ == Msg_max_ - 1) {
       put_cond_.notify_one();
     }
-    return message;
+    return true;
   }
 
-  void putMsg(Msg* message) {
+  void putMsg(Msg message) {
     std::unique_lock<std::mutex> lock(put_mutex_);  // 作用域结束自动释放
     while (Msg_len_ > Msg_max_ && !nonblock_) {
       put_cond_.wait(lock);
@@ -62,18 +58,18 @@ class MsgQueue {
     if (Msg_len_ == Msg_max_ && nonblock_) {
       return;
     }
-    msgs_->emplace_back(message);
+    msgs_.emplace_back(std::move(message));
     Msg_len_++;
     get_cond_.notify_one();  // 唤醒一个等待读消息的线程
   }
 
   // 向队列头部插入消息
-  void putMsgToHead(Msg* message) {
+  void putMsgToHead(Msg message) {
     std::unique_lock<std::mutex> lock(put_mutex_);
     while (Msg_len_ > Msg_max_ && !nonblock_) {
       put_cond_.wait(lock);
     }
-    msgs_->emplace_front(message);
+    msgs_.emplace_front(std::move(message));
     Msg_len_++;
     get_cond_.notify_one();
   }
@@ -92,7 +88,7 @@ class MsgQueue {
   size_t Msg_max_;
   size_t Msg_len_;
   bool nonblock_;  // 默认阻塞
-  std::deque<Msg*> *msgs_;
+  std::deque<Msg> msgs_;
   std::mutex get_mutex_;
   std::mutex put_mutex_;
   std::condition_variable get_cond_;

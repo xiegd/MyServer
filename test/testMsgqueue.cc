@@ -32,46 +32,46 @@ protected:
 // 测试用例：测试基本的放入和获取消息功能
 // TEST_F 宏用于创建使用测试夹具的测试
 TEST_F(MsgQueueTest, PutAndGetMessage) {
-    TestMsg* msg = new TestMsg(42);
-    queue.putMsg(msg);                    // 放入消息
-    TestMsg* received = queue.getMsg();   // 获取消息
-    ASSERT_NE(received, nullptr);         // 断言：确保收到的消息不为空
-    EXPECT_EQ(received->value, 42);       // 断言：检查消息的值
-    delete received;                      // 清理资源
+    TestMsg msg{42};                    // 使用 {} 进行初始化
+    queue.putMsg(msg);                  // 放入消息
+    TestMsg received{0};                // 创建一个临时对象
+    bool result = queue.getMsg(received);  // 获取消息
+    EXPECT_TRUE(result);                // 检查是否成功获取消息
+    EXPECT_EQ(received.value, 42);      // 断言：检查消息的值
 }
 
 // 测试用例：测试将消息放入队列头部的功能
 TEST_F(MsgQueueTest, PutToHeadAndGet) {
-    TestMsg* msg1 = new TestMsg(1);
-    TestMsg* msg2 = new TestMsg(2);
+    TestMsg msg1{1};                    // 使用 {} 进行初始化
+    TestMsg msg2{2};                    // 使用 {} 进行初始化
     queue.putMsg(msg1);
     queue.putMsgToHead(msg2);
     
-    TestMsg* received = queue.getMsg();
-    ASSERT_NE(received, nullptr);
-    EXPECT_EQ(received->value, 2);        // 期望先获取到放入尾部的消息
-    delete received;
+    TestMsg received{0};                // 创建一个临时对象
+    bool result = queue.getMsg(received);
+    EXPECT_TRUE(result);                // 检查是否成功获取消息
+    EXPECT_EQ(received.value, 2);       // 期望先获取到放入头部的消息
 
-    received = queue.getMsg();
-    ASSERT_NE(received, nullptr);
-    EXPECT_EQ(received->value, 1);
-    delete received;
+    result = queue.getMsg(received);
+    EXPECT_TRUE(result);                // 检查是否成功获取消息
+    EXPECT_EQ(received.value, 1);
 }
 
 // 测试用例：测试非阻塞模式
 TEST_F(MsgQueueTest, NonBlockingMode) {
-    queue_with_size.setNonblock();        // 设置为非阻塞模式
+    queue_with_size.setNonblock();      // 设置为非阻塞模式
     for (int i = 0; i < 10; ++i) {
-        queue_with_size.putMsg(new TestMsg(i));
+        queue_with_size.putMsg(TestMsg{i}); // 使用 {} 进行初始化
     }
+    TestMsg received{0};                // 创建一个临时对象
     while (queue_with_size.size() > 0) {
-        TestMsg* msg = queue_with_size.getMsg();
+        bool result = queue_with_size.getMsg(received);
+        EXPECT_TRUE(result);            // 检查是否成功获取消息
         if (queue_with_size.size() == 0) {
             // 在非阻塞模式下，队列应该只保留前5个消息（因为队列大小为5）
             // 所以最后一个消息是4
-            EXPECT_EQ(msg->value, 4);
+            EXPECT_EQ(received.value, 4);
         }
-        delete msg;
     }
 }
 
@@ -80,7 +80,7 @@ TEST_F(MsgQueueTest, BlockingMode) {
     // 使用lambda表达式作为参数，捕获当前对象的this指针
     std::thread producer([this]() {
         for (int i = 0; i < 100; ++i) {
-            queue_with_size.putMsg(new TestMsg(i));
+            queue_with_size.putMsg(TestMsg{i}); // 使用 {} 进行初始化
             // std::cout << "putMsg: " << i << std::endl;
             std::this_thread::sleep_for(std::chrono::milliseconds(1));  // 线程sleep 10ms
         }
@@ -88,11 +88,12 @@ TEST_F(MsgQueueTest, BlockingMode) {
 
     std::thread consumer([this]() {
         for (int i = 0; i < 100; ++i) {
-            TestMsg* msg = queue_with_size.getMsg();
-            // std::cout << "getMsg: " << msg->value << std::endl;
-            EXPECT_EQ(msg->value, i);
+            TestMsg received{0};                // 创建一个临时对象
+            bool result = queue_with_size.getMsg(received);
+            EXPECT_TRUE(result);                // 检查是否成功获取消息
+            // std::cout << "getMsg: " << received.value << std::endl;
+            EXPECT_EQ(received.value, i);
             std::this_thread::sleep_for(std::chrono::milliseconds(2));  // 线程sleep 10ms
-            delete msg;
         }
     });
 
