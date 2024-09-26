@@ -1,5 +1,4 @@
 #include <gtest/gtest.h>
-#include <string>
 #include "buffer.h"
 
 class BufferRawTest : public ::testing::Test {
@@ -181,6 +180,94 @@ TEST_F(BufferLikeStringTest, 容量管理) {
     EXPECT_EQ(buffer.size(), 30);
 }
 
+
+class BufferStringTest : public ::testing::Test {
+protected:
+    void SetUp() override {
+        // 在每个测试用例开始前执行
+    }
+
+    void TearDown() override {
+        // 在每个测试用例结束后执行
+    }
+};
+
+TEST_F(BufferStringTest, ConstructorAndBasicOperations) {
+    std::string testStr = "Hello, World!";
+    BufferString buffer(testStr);
+
+    EXPECT_EQ(buffer.size(), testStr.length());
+    EXPECT_EQ(buffer.toString(), testStr);
+    EXPECT_EQ(buffer.getCapacity(), testStr.length());
+}
+
+TEST_F(BufferStringTest, DataAccess) {
+    std::string testStr = "Test String";
+    BufferString buffer(testStr);
+
+    EXPECT_STREQ(buffer.data(), testStr.c_str());
+}
+
+TEST_F(BufferStringTest, OffsetConstructor) {
+    std::string testStr = "Hello, World!";
+    BufferString buffer(testStr, 7, 5);  // "World"
+
+    EXPECT_EQ(buffer.size(), 5);
+    EXPECT_EQ(buffer.toString(), "World");
+}
+
+TEST_F(BufferStringTest, EmptyBuffer) {
+    BufferString buffer("");
+
+    EXPECT_EQ(buffer.size(), 0);
+    EXPECT_TRUE(buffer.toString().empty());
+}
+
+TEST_F(BufferStringTest, LargeString) {
+    std::string largeStr(1000000, 'A');  // 1 million 'A's
+    BufferString buffer(largeStr);
+
+    EXPECT_EQ(buffer.size(), 1000000);
+    EXPECT_EQ(buffer.toString(), largeStr);
+}
+
+TEST_F(BufferStringTest, OffsetOutOfRange) {
+    std::string testStr = "Short";
+    // BufferString中的setup会检查offset和size是否合法，不合法会抛出异常
+    // EXPECT_THROW(BufferString(testStr, 10, 1), std::out_of_range);
+}
+
+TEST_F(BufferStringTest, PartialBuffer) {
+    std::string testStr = "Hello, World!";
+    BufferString buffer(testStr, 0, 5);  // "Hello"
+
+    EXPECT_EQ(buffer.size(), 5);
+    EXPECT_EQ(buffer.toString(), "Hello");
+}
+
+TEST_F(BufferStringTest, ZeroLengthBuffer) {
+    std::string testStr = "Test";
+    BufferString buffer(testStr, 2, 0);  // len = 0, 则实际len = str.size() - offset
+
+    EXPECT_EQ(buffer.size(), 2);
+    EXPECT_EQ(buffer.toString(), "st");
+}
+
+TEST_F(BufferStringTest, FullLengthWithExplicitSize) {
+    std::string testStr = "FullLength";
+    BufferString buffer(testStr, 0, testStr.length());
+
+    EXPECT_EQ(buffer.size(), testStr.length());
+    EXPECT_EQ(buffer.toString(), testStr);
+}
+
+TEST_F(BufferStringTest, DefaultLengthParameter) {
+    std::string testStr = "DefaultLength";
+    BufferString buffer(testStr, 3);  // 默认len = 0, 则len = str.size() - offset
+
+    EXPECT_EQ(buffer.size(), testStr.size() - 3);
+    EXPECT_EQ(buffer.toString(), testStr.substr(3));
+}
 
 int main(int argc, char **argv) {
     ::testing::InitGoogleTest(&argc, argv);

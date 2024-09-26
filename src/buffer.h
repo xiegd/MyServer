@@ -49,7 +49,7 @@ private:
 template <typename C>
 class BufferOffset : public Buffer {
 public:
-    BufferOffset(C data, size_t offset = 0, size_t len = 0) {}
+    BufferOffset(C data, size_t offset = 0, size_t len = 0) : data_{std::move(data)} { setup(offset, len); }
     ~BufferOffset() override = default;
 
 public:
@@ -317,6 +317,7 @@ private:
 
 // 统计缓冲区对象个数
 StatisticImpl(Buffer) 
+StatisticImpl(BufferString)
 StatisticImpl(BufferRaw) 
 StatisticImpl(BufferLikeString)
 #endif
