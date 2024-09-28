@@ -12,28 +12,24 @@
 #define UTIL_TIMETICKER_H_
 
 #include <cassert>
-
+// logger.h包含了util.h, 其中有getCurrentMillisecond()等
 #include "logger.h"
 
 namespace toolkit {
 
+/**
+ * @brief 计时器类，用于代码执行时间统计和一般计时
+ * 
+ * Ticker 类可以用于统计代码执行时间，并在代码执行时间超过指定阈值时打印警告日志。
+ */
 class Ticker {
-   public:
+public:
     /**
-     * 此对象可以用于代码执行时间统计，以可以用于一般计时
-     * @param min_ms
-     开启码执行时间统计时，如果代码执行耗时超过该参数，则打印警告日志
-     * @param ctx 日志上下文捕获，用于捕获当前日志代码所在位置
-     * @param print_log 是否打印代码执行时间
-     * This object can be used for code execution time statistics, and can be
-     used for general timing
-     * @param min_ms When the code execution time statistics is enabled, if the
-     code execution time exceeds this parameter, a warning log is printed
-     * @param ctx Log context capture, used to capture the current log code
-     location
-     * @param print_log Whether to print the code execution time
-
-     * [AUTO-TRANSLATED:4436cf19]
+     * @brief 构造函数
+     * 
+     * @param min_ms 代码执行时间统计的最小阈值，单位为毫秒。如果代码执行时间超过该阈值，则打印警告日志。
+     * @param ctx 日志上下文捕获，用于捕获当前日志代码所在位置。
+     * @param print_log 是否打印代码执行时间。
      */
     Ticker(uint64_t min_ms = 0,
            LogContextCapture ctx = LogContextCapture(Logger::Instance(), LWarn,
@@ -47,6 +43,11 @@ class Ticker {
         _min_ms = min_ms;
     }
 
+    /**
+     * @brief 析构函数
+     * 
+     * 在析构时，如果代码执行时间超过指定的最小阈值，则打印警告日志。
+     */
     ~Ticker() {
         uint64_t tm = createdTime();
         if (tm > _min_ms) {
@@ -58,61 +59,57 @@ class Ticker {
     }
 
     /**
-     * 获取上次resetTime后至今的时间，单位毫秒
-     * Get the time from the last resetTime to now, in milliseconds
-
-     * [AUTO-TRANSLATED:739ad90a]
+     * @brief 获取上次重置计时器后至今的时间，单位为毫秒
+     * 
+     * @return 上次重置计时器后至今的时间，单位为毫秒
      */
     uint64_t elapsedTime() const { return getCurrentMillisecond() - _begin; }
 
     /**
-     * 获取从创建至今的时间，单位毫秒
-     * Get the time from creation to now, in milliseconds
-
-     * [AUTO-TRANSLATED:83a189e2]
+     * @brief 获取从创建计时器至今的时间，单位为毫秒
+     * 
+     * @return 从创建计时器至今的时间，单位为毫秒
      */
     uint64_t createdTime() const { return getCurrentMillisecond() - _created; }
 
     /**
-     * 重置计时器
-     * Reset the timer
-
-     * [AUTO-TRANSLATED:2500c6f1]
+     * @brief 重置计时器
      */
     void resetTime() { _begin = getCurrentMillisecond(); }
 
-   private:
-    uint64_t _min_ms;
-    uint64_t _begin;
-    uint64_t _created;
-    LogContextCapture _ctx;
+private:
+    uint64_t _min_ms;  ///< 代码执行时间统计的最小阈值，单位为毫秒
+    uint64_t _begin;   ///< 上次重置计时器的时间，单位为毫秒
+    uint64_t _created; ///< 创建计时器的时间，单位为毫秒
+    LogContextCapture _ctx; ///< 日志上下文捕获，用于捕获当前日志代码所在位置
 };
 
+/**
+ * @brief 平滑计时器类，用于生成平滑的时间戳
+ * 
+ * SmoothTicker 类用于生成平滑的时间戳，防止由于网络抖动导致时间戳不平滑。
+ */
 class SmoothTicker {
-   public:
+public:
     /**
-     * 此对象用于生成平滑的时间戳
-     * @param reset_ms 时间戳重置间隔，没间隔reset_ms毫秒,
-     生成的时间戳会同步一次系统时间戳
-     * This object is used to generate smooth timestamps
-     * @param reset_ms Timestamp reset interval, every reset_ms milliseconds,
-     the generated timestamp will be synchronized with the system timestamp
-
-     * [AUTO-TRANSLATED:0ff567e7]
+     * @brief 构造函数
+     * 
+     * @param reset_ms 时间戳重置间隔，单位为毫秒。每隔 reset_ms 毫秒，生成的时间戳会同步一次系统时间戳。
      */
     SmoothTicker(uint64_t reset_ms = 10000) {
         _reset_ms = reset_ms;
         _ticker.resetTime();
     }
 
+    /**
+     * @brief 析构函数
+     */
     ~SmoothTicker() {}
 
     /**
-     * 返回平滑的时间戳，防止由于网络抖动导致时间戳不平滑
-     * Return a smooth timestamp, to prevent the timestamp from being unsmooth
-     due to network jitter
-
-     * [AUTO-TRANSLATED:26f78ae3]
+     * @brief 返回平滑的时间戳，防止由于网络抖动导致时间戳不平滑
+     * 
+     * @return 平滑的时间戳，单位为毫秒
      */
     uint64_t elapsedTime() {
         auto now_time = _ticker.elapsedTime();
@@ -143,10 +140,7 @@ class SmoothTicker {
     }
 
     /**
-     * 时间戳重置为0开始
-     * Reset the timestamp to start from 0
-
-     * [AUTO-TRANSLATED:ca42c3d1]
+     * @brief 重置时间戳为0开始
      */
     void resetTime() {
         _first_time = 0;
@@ -154,13 +148,13 @@ class SmoothTicker {
         _ticker.resetTime();
     }
 
-   private:
-    double _time_inc = 0;
-    uint64_t _first_time = 0;
-    uint64_t _last_time = 0;
-    uint64_t _pkt_count = 0;
-    uint64_t _reset_ms;
-    Ticker _ticker;
+private:
+    double _time_inc = 0; ///< 时间增量，用于平滑时间戳
+    uint64_t _first_time = 0; ///< 第一次记录的时间戳
+    uint64_t _last_time = 0; ///< 上一次记录的时间戳
+    uint64_t _pkt_count = 0; ///< 包计数器
+    uint64_t _reset_ms; ///< 时间戳重置间隔，单位为毫秒
+    Ticker _ticker; ///< 内部使用的 Ticker 对象
 };
 
 #if !defined(NDEBUG)

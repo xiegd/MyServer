@@ -16,6 +16,7 @@
 
 namespace toolkit {
 
+// 确保某段代码只被执行一次, 在构造时执行指定的初始化函数, 析构时可选择执行指定的清理函数
 class onceToken {
    public:
     using task = std::function<void(void)>;
@@ -37,6 +38,7 @@ class onceToken {
     }
 
    private:
+    // 删除默认构造，拷贝，移动，确保onceToken只能通过参数构造
     onceToken() = delete;
     onceToken(const onceToken &) = delete;
     onceToken(onceToken &&) = delete;

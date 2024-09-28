@@ -57,32 +57,45 @@
  * designed to work with what time(NULL) may return, and to support Redis
  * logging of the dates, it's not really a complete implementation. */
 namespace toolkit {
+
+// 全局变量：存储当前是否处于夏令时
 static int _daylight_active;
+// 全局变量：存储当前时区偏移（秒）
 static long _current_timezone;
 
+// 获取当前夏令时状态
 int get_daylight_active() { return _daylight_active; }
 
+/**
+ * 判断给定年份是否为闰年
+ * @param year 要判断的年份
+ * @return 1 如果是闰年，0 如果不是闰年
+ */
 static int is_leap_year(time_t year) {
-    if (year % 4)
-        return 0; /* A year not divisible by 4 is not leap. */
-    else if (year % 100)
-        return 1; /* If div by 4 and not 100 is surely leap. */
-    else if (year % 400)
-        return 0; /* If div by 100 *and* not by 400 is not leap. */
-    else
-        return 1; /* If div by 100 and 400 is leap. */
+    if (year % 4) return 0;      // 不能被4整除的年份不是闰年
+    else if (year % 100) return 1; // 能被4整除但不能被100整除的是闰年
+    else if (year % 400) return 0; // 能被100整除但不能被400整除的不是闰年
+    else return 1;               // 能被400整除的是闰年
 }
 
+/**
+ * 不使用锁的本地时间转换函数
+ * 将UNIX时间戳转换为本地时间的struct tm结构
+ * @param tmp 指向要填充的tm结构的指针
+ * @param t UNIX时间戳
+ */
 void no_locks_localtime(struct tm *tmp, time_t t) {
     const time_t secs_min = 60;
     const time_t secs_hour = 3600;
     const time_t secs_day = 3600 * 24;
 
-    t -= _current_timezone;            /* Adjust for timezone. */
-    t += 3600 * get_daylight_active(); /* Adjust for daylight time. */
-    time_t days = t / secs_day;        /* Days passed since epoch. */
-    time_t seconds = t % secs_day;     /* Remaining seconds. */
+    // 调整时区和夏令时
+    t -= _current_timezone;
+    t += 3600 * get_daylight_active();
+    time_t days = t / secs_day;        // 自1970年1月1日以来的天数
+    time_t seconds = t % secs_day;     // 当天剩余秒数
 
+    // 填充tm结构
     tmp->tm_isdst = get_daylight_active();
     tmp->tm_hour = seconds / secs_hour;
     tmp->tm_min = (seconds % secs_hour) / secs_min;
@@ -90,25 +103,22 @@ void no_locks_localtime(struct tm *tmp, time_t t) {
 #ifndef _WIN32
     tmp->tm_gmtoff = -_current_timezone;
 #endif
-    /* 1/1/1970 was a Thursday, that is, day 4 from the POV of the tm structure
-     * where sunday = 0, so to calculate the day of the week we have to add 4
-     * and take the modulo by 7. */
+    // 1970.01.01是星期四， 0代表星期日， 所以4代表星期四，即第一天是周四
+    // 计算星期几（0 = 星期日）
     tmp->tm_wday = (days + 4) % 7;
 
-    /* Calculate the current year. */
+    // 计算年份和年内天数
     tmp->tm_year = 1970;
     while (1) {
-        /* Leap years have one day more. */
         time_t days_this_year = 365 + is_leap_year(tmp->tm_year);
         if (days_this_year > days) break;
         days -= days_this_year;
         tmp->tm_year++;
     }
-    tmp->tm_yday = days; /* Number of day of the current year. */
 
-    /* We need to calculate in which month and day of the month we are. To do
-     * so we need to skip days according to how many days there are in each
-     * month, and adjust for the leap year that has one more day in February. */
+    tmp->tm_yday = days;
+
+    // 计算月份和日期
     int mdays[12] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
     mdays[1] += is_leap_year(tmp->tm_year);
 
@@ -118,16 +128,21 @@ void no_locks_localtime(struct tm *tmp, time_t t) {
         tmp->tm_mon++;
     }
 
-    tmp->tm_mday = days + 1; /* Add 1 since our 'days' is zero-based. */
-    tmp->tm_year -= 1900;    /* Surprisingly tm_year is year-1900. */
+    tmp->tm_mday = days + 1;
+    tmp->tm_year -= 1900;  // tm_year是从1900年开始计数的
 }
 
+/**
+ * 初始化本地时间信息
+ * 设置全局变量 _current_timezone 和 _daylight_active
+ */
 void local_time_init() {
-    /* Obtain timezone and daylight info. */
-    tzset(); /* Now 'timezome' global is populated. */
+    tzset();  // 初始化时区信息
+
 #if defined(__linux__) || defined(__sun)
     _current_timezone = timezone;
 #elif defined(_WIN32)
+    // Windows平台特定的时区计算
     time_t time_utc;
     struct tm tm_local;
 
@@ -158,13 +173,17 @@ void local_time_init() {
 
     _current_timezone = time_zone;
 #else
+    // 其他平台使用gettimeofday获取时区信息
     struct timeval tv;
     struct timezone tz;
     gettimeofday(&tv, &tz);
     _current_timezone = tz.tz_minuteswest * 60L;
 #endif
+
+    // 获取当前夏令时状态
     time_t t = time(NULL);
     struct tm *aux = localtime(&t);
     _daylight_active = aux->tm_isdst;
 }
+
 }  // namespace toolkit

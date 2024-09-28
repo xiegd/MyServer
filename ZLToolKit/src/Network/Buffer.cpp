@@ -16,6 +16,8 @@
 
 namespace toolkit {
 
+// BufferOffset是一个模板类，不是一个具体的类型，对其使用StatisticImp时
+// 无法确定为哪一个BufferOffset的实例化版本生成统计的ObjectCounter
 StatisticImp(Buffer) StatisticImp(BufferRaw) StatisticImp(BufferLikeString)
 
     BufferRaw::Ptr BufferRaw::create() {

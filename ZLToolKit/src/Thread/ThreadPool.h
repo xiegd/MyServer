@@ -19,20 +19,39 @@
 
 namespace toolkit {
 
+/**
+ * @class ThreadPool
+ * @brief 线程池类,继承自TaskExecutor
+ * 
+ * 实现了一个可配置的线程池,支持异步任务执行和优先级设置
+ */
 class ThreadPool : public TaskExecutor {
    public:
+    /**
+     * @enum Priority
+     * @brief 线程优先级枚举
+     */
     enum Priority {
-        PRIORITY_LOWEST = 0,
-        PRIORITY_LOW,
-        PRIORITY_NORMAL,
-        PRIORITY_HIGH,
-        PRIORITY_HIGHEST
+        PRIORITY_LOWEST = 0,   ///< 最低优先级
+        PRIORITY_LOW,          ///< 低优先级
+        PRIORITY_NORMAL,       ///< 普通优先级
+        PRIORITY_HIGH,         ///< 高优先级
+        PRIORITY_HIGHEST       ///< 最高优先级
     };
 
+    /**
+     * @brief 构造函数
+     * @param num 线程数量,默认为1
+     * @param priority 线程优先级,默认为最高
+     * @param auto_run 是否自动启动线程池,默认为true
+     * @param set_affinity 是否设置线程亲和性,默认为true
+     * @param pool_name 线程池名称,默认为"thread pool"
+     */
     ThreadPool(int num = 1, Priority priority = PRIORITY_HIGHEST,
                bool auto_run = true, bool set_affinity = true,
                const std::string &pool_name = "thread pool") {
         _thread_num = num;
+        // 设置线程初始化函数
         _on_setup = [pool_name, priority, set_affinity](int index) {
             std::string name = pool_name + ' ' + std::to_string(index);
             setPriority(priority);
@@ -47,13 +66,22 @@ class ThreadPool : public TaskExecutor {
         }
     }
 
+    /**
+     * @brief 析构函数
+     * 
+     * 关闭线程池并等待所有线程结束
+     */
     ~ThreadPool() {
         shutdown();
         wait();
     }
 
-    //把任务打入线程池并异步执行  [AUTO-TRANSLATED:651c8d5a]
-    // Put the task into the thread pool and execute it asynchronously
+    /**
+     * @brief 异步执行任务
+     * @param task 要执行的任务
+     * @param may_sync 是否允许同步执行,默认为true
+     * @return 任务的智能指针
+     */
     Task::Ptr async(TaskIn task, bool may_sync = true) override {
         if (may_sync && _thread_group.is_this_thread_in()) {
             task();
@@ -64,6 +92,12 @@ class ThreadPool : public TaskExecutor {
         return ret;
     }
 
+    /**
+     * @brief 以最高优先级异步执行任务
+     * @param task 要执行的任务
+     * @param may_sync 是否允许同步执行,默认为true
+     * @return 任务的智能指针
+     */
     Task::Ptr async_first(TaskIn task, bool may_sync = true) override {
         if (may_sync && _thread_group.is_this_thread_in()) {
             task();
@@ -75,12 +109,23 @@ class ThreadPool : public TaskExecutor {
         return ret;
     }
 
+    /**
+     * @brief 获取当前任务队列大小
+     * @return 任务队列中的任务数量
+     */
     size_t size() { return _queue.size(); }
 
+    /**
+     * @brief 设置线程优先级
+     * @param priority 要设置的优先级
+     * @param threadId 线程ID,默认为0(当前线程)
+     * @return 是否设置成功
+     */
     static bool setPriority(Priority priority = PRIORITY_NORMAL,
                             std::thread::native_handle_type threadId = 0) {
-        // set priority
+        // 根据不同平台设置线程优先级
 #if defined(_WIN32)
+        // Windows平台实现
         static int Priorities[] = {
             THREAD_PRIORITY_LOWEST, THREAD_PRIORITY_BELOW_NORMAL,
             THREAD_PRIORITY_NORMAL, THREAD_PRIORITY_ABOVE_NORMAL,
@@ -91,6 +136,7 @@ class ThreadPool : public TaskExecutor {
         }
         return true;
 #else
+        // 非Windows平台实现(如Linux)
         static int Min = sched_get_priority_min(SCHED_FIFO);
         if (Min == -1) {
             return false;
@@ -112,6 +158,9 @@ class ThreadPool : public TaskExecutor {
 #endif
     }
 
+    /**
+     * @brief 启动线程池
+     */
     void start() {
         if (_thread_num <= 0) {
             return;
@@ -123,14 +172,17 @@ class ThreadPool : public TaskExecutor {
     }
 
    private:
+    /**
+     * @brief 线程运行函数
+     * @param index 线程索引
+     */
     void run(size_t index) {
         _on_setup(index);
         Task::Ptr task;
         while (true) {
             startSleep();
             if (!_queue.get_task(task)) {
-                //空任务，退出线程  [AUTO-TRANSLATED:583e2f11]
-                // Empty task, exit the thread
+                // 空任务,退出线程
                 break;
             }
             sleepWakeUp();
@@ -143,16 +195,22 @@ class ThreadPool : public TaskExecutor {
         }
     }
 
+    /**
+     * @brief 等待所有线程结束
+     */
     void wait() { _thread_group.join_all(); }
 
+    /**
+     * @brief 关闭线程池
+     */
     void shutdown() { _queue.push_exit(_thread_num); }
 
    private:
-    size_t _thread_num;
-    Logger::Ptr _logger;
-    thread_group _thread_group;
-    TaskQueue<Task::Ptr> _queue;
-    std::function<void(int)> _on_setup;
+    size_t _thread_num;                    ///< 线程数量
+    Logger::Ptr _logger;                   ///< 日志指针
+    thread_group _thread_group;            ///< 线程组
+    TaskQueue<Task::Ptr> _queue;           ///< 任务队列
+    std::function<void(int)> _on_setup;    ///< 线程初始化函数
 };
 
 } /* namespace toolkit */

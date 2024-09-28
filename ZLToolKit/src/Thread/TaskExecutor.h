@@ -110,13 +110,15 @@ public:
     template <typename FUNC>
     TaskCancelableImp(FUNC &&task) {
         _strongTask = std::make_shared<func_type>(std::forward<FUNC>(task));
-        _weakTask = _strongTask;
+        _weakTask = _strongTask;  // 弱引用避免循环引用 
     }
 
     /**
      * @brief 取消任务
      */
-    void cancel() override { _strongTask = nullptr; }
+    void cancel() override { 
+        _strongTask = nullptr; // 引用计数减1
+    }
 
     /**
      * @brief 检查任务是否有效
@@ -171,8 +173,8 @@ protected:
     std::shared_ptr<func_type> _strongTask;
 };
 
-using TaskIn = std::function<void()>;
-using Task = TaskCancelableImp<void()>;
+using TaskIn = std::function<void()>;  // 通用函数包装器，用于表示一个不接受参数且不返回任何值的函数
+using Task = TaskCancelableImp<void()>;  // 模板类实例，表示一个不接受参数且不返回任何值的可取消任务
 
 /**
  * @class TaskExecutorInterface
@@ -189,7 +191,7 @@ public:
      * @param may_sync 是否允许同步执行
      * @return 任务是否添加成功
      */
-    virtual Task::Ptr async(TaskIn task, bool may_sync = true) = 0;
+    virtual Task::Ptr async(TaskIn task, bool may_sync = true) = 0;  // 纯虚函数，抽象类
 
     /**
      * @brief 以最高优先级异步执行任务

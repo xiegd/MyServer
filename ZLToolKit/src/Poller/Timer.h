@@ -1,11 +1,10 @@
-﻿/*
- * Copyright (c) 2016 The ZLToolKit project authors. All Rights Reserved.
+﻿/**
+ * @file Timer.h
+ * @brief 定义了一个简单的定时器类
  *
- * This file is part of ZLToolKit(https://github.com/ZLMediaKit/ZLToolKit).
- *
- * Use of this source code is governed by MIT license that can be found in the
- * LICENSE file in the root of the source tree. All contributing project authors
- * may be found in the AUTHORS file in the root of the source tree.
+ * 这个文件定义了Timer类，它提供了一种方便的方式来创建和管理定时任务。
+ * Timer类使用EventPoller来调度任务，支持重复执行和自定义间隔时间。
+ * 它适用于需要定期执行任务或延迟执行任务的场景。
  */
 
 #ifndef Timer_h
@@ -17,35 +16,34 @@
 
 namespace toolkit {
 
+/**
+ * @class Timer
+ * @brief 定时器类，用于创建和管理定时任务
+ */
 class Timer {
-   public:
+public:
     using Ptr = std::shared_ptr<Timer>;
 
     /**
-     * 构造定时器
-     * @param second 定时器重复秒数
-     * @param cb
-     定时器任务，返回true表示重复下次任务，否则不重复，如果任务中抛异常，则默认重复下次任务
-     * @param poller EventPoller对象，可以为nullptr
-     * Constructs a timer
-     * @param second Timer repeat interval in seconds
-     * @param cb Timer task, returns true to repeat the next task, otherwise
-     does not repeat. If an exception is thrown in the task, it defaults to
-     repeating the next task
-     * @param poller EventPoller object, can be nullptr
-
-     * [AUTO-TRANSLATED:7dc94698]
+     * @brief 构造定时器
+     * 
+     * @param second 定时器重复间隔，单位为秒
+     * @param cb 定时器任务回调函数。返回true表示重复执行，false表示只执行一次。
+     *           如果回调函数抛出异常，默认会重复执行下一次任务。
+     * @param poller EventPoller对象，用于调度任务。可以为nullptr，此时会使用默认的EventPoller。
      */
     Timer(float second, const std::function<bool()> &cb,
           const EventPoller::Ptr &poller);
+
+    /**
+     * @brief 析构函数
+     */
     ~Timer();
 
-   private:
+private:
     std::weak_ptr<EventPoller::DelayTask> _tag;
-    //定时器保持EventPoller的强引用  [AUTO-TRANSLATED:d171cd2f]
-    // Timer keeps a strong reference to EventPoller
-    EventPoller::Ptr _poller;
+    EventPoller::Ptr _poller; ///< 定时器持有EventPoller的强引用
 };
 
-}  // namespace toolkit
+} // namespace toolkit
 #endif /* Timer_h */

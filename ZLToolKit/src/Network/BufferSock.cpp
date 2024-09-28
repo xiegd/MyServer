@@ -15,6 +15,9 @@
 #include "Util/logger.h"
 #include "Util/uv_errno.h"
 
+// __linux__和__linux都是Linux上编译器自动定义的预定义宏
+// 主要确保代码的兼容性和可移植性, 一些旧版本系统上可能不支持，需要自己定义
+// 刚才看了下在ubuntu22上直接include socket.h下面的这两个系统调用和那个mmsghdr结构体都有了
 #if defined(__linux__) || defined(__linux)
 
 #ifndef _GNU_SOURCE
@@ -42,8 +45,8 @@ static inline int sendmmsg(int fd, struct mmsghdr *mmsg, unsigned vlen,
 #endif
 
 #ifndef HAVE_RECVMMSG_API
-#include <sys/syscall.h>
-#include <unistd.h>
+#include <sys/syscall.h>  // 提供系统调用号的定义包括__NR_recvmmsg
+#include <unistd.h> // 提供syscall声明
 static inline int recvmmsg(int fd, struct mmsghdr *mmsg, unsigned vlen,
                            unsigned flags, struct timespec *timeout) {
     return syscall(__NR_recvmmsg, fd, mmsg, vlen, flags, timeout);
@@ -118,7 +121,6 @@ class BufferCallBack {
 };
 
 /////////////////////////////////////// BufferSendMsg
-//////////////////////////////////////////
 #if defined(_WIN32)
 using SocketBuf = WSABUF;
 #else

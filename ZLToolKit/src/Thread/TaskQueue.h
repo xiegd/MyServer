@@ -1,32 +1,38 @@
 ﻿/*
- * Copyright (c) 2016 The ZLToolKit project authors. All Rights Reserved.
+ * TaskQueue.h
  *
- * This file is part of ZLToolKit(https://github.com/ZLMediaKit/ZLToolKit).
- *
- * Use of this source code is governed by MIT license that can be found in the
- * LICENSE file in the root of the source tree. All contributing project authors
- * may be found in the AUTHORS file in the root of the source tree.
+ * 该文件定义了一个基于函数对象的任务队列类 TaskQueue。
+ * TaskQueue 是线程安全的，使用信号量控制任务队列中的任务数量。
+ * 任务可以被添加到队列的末尾或开头，并由执行线程从队列中获取并执行。
  */
 
 #ifndef TASKQUEUE_H_
 #define TASKQUEUE_H_
 
 #include <mutex>
-
 #include "Util/List.h"
 #include "semaphore.h"
 
 namespace toolkit {
 
-//实现了一个基于函数对象的任务列队，该列队是线程安全的，任务列队任务数由信号量控制
-//[AUTO-TRANSLATED:67e02e93] Implemented a task queue based on function objects,
-// which is thread-safe, and the number of tasks in the task queue is controlled
-// by a semaphore
+/**
+ * @class TaskQueue
+ * @brief 基于函数对象的任务队列类
+ * 
+ * 该类实现了一个线程安全的任务队列，使用信号量控制任务队列中的任务数量。
+ * 任务可以被添加到队列的末尾或开头，并由执行线程从队列中获取并执行。
+ * 
+ * @tparam T 任务类型
+ */
 template <typename T>
 class TaskQueue {
    public:
-    //打入任务至列队  [AUTO-TRANSLATED:d08b5817]
-    // Put a task into the queue
+    /**
+     * @brief 将任务添加到队列末尾
+     * 
+     * @tparam C 任务类型
+     * @param task_func 任务函数对象
+     */
     template <typename C>
     void push_task(C &&task_func) {
         {
@@ -36,6 +42,12 @@ class TaskQueue {
         _sem.post();
     }
 
+    /**
+     * @brief 将任务添加到队列开头
+     * 
+     * @tparam C 任务类型
+     * @param task_func 任务函数对象
+     */
     template <typename C>
     void push_task_first(C &&task_func) {
         {
@@ -45,12 +57,21 @@ class TaskQueue {
         _sem.post();
     }
 
-    //清空任务列队  [AUTO-TRANSLATED:dbcd7fe9]
-    // Clear the task queue
+    /**
+     * @brief 清空任务队列
+     * 
+     * @param n 要清空的任务数量
+     */
     void push_exit(size_t n) { _sem.post(n); }
 
-    //从列队获取一个任务，由执行线程执行  [AUTO-TRANSLATED:4a1143ae]
-    // Get a task from the queue and execute it by the executing thread
+    /**
+     * @brief 从队列中获取一个任务
+     * 
+     * 该方法由执行线程调用，从队列中获取一个任务并执行。
+     * 
+     * @param tsk 任务对象
+     * @return 是否成功获取任务
+     */
     bool get_task(T &tsk) {
         _sem.wait();
         std::lock_guard<decltype(_mutex)> lock(_mutex);
@@ -62,15 +83,20 @@ class TaskQueue {
         return true;
     }
 
+    /**
+     * @brief 获取队列中的任务数量
+     * 
+     * @return 任务数量
+     */
     size_t size() const {
         std::lock_guard<decltype(_mutex)> lock(_mutex);
         return _queue.size();
     }
 
    private:
-    List<T> _queue;
-    mutable std::mutex _mutex;
-    semaphore _sem;
+    List<T> _queue; ///< 任务队列
+    mutable std::mutex _mutex; ///< 互斥锁，保护任务队列
+    semaphore _sem; ///< 信号量，控制任务数量
 };
 
 } /* namespace toolkit */

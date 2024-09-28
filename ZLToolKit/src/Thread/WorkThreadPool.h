@@ -17,71 +17,74 @@
 
 namespace toolkit {
 
+/**
+ * @class WorkThreadPool
+ * @brief 工作线程池类,实现了单例模式和任务执行器获取接口
+ * 
+ * 该类管理一组EventPoller实例,用于处理异步任务
+ */
 class WorkThreadPool : public std::enable_shared_from_this<WorkThreadPool>,
                        public TaskExecutorGetterImp {
    public:
+    /**
+     * @typedef Ptr
+     * @brief WorkThreadPool的智能指针类型
+     */
     using Ptr = std::shared_ptr<WorkThreadPool>;
 
+    /**
+     * @brief 虚析构函数
+     */
     ~WorkThreadPool() override = default;
 
     /**
-     * 获取单例
-     * Get the singleton instance
-
-     * [AUTO-TRANSLATED:c8852589]
+     * @brief 获取WorkThreadPool单例实例
+     * @return WorkThreadPool& 单例实例的引用
      */
     static WorkThreadPool &Instance();
 
     /**
-     * 设置EventPoller个数，在WorkThreadPool单例创建前有效
-     * 在不调用此方法的情况下，默认创建thread::hardware_concurrency()个EventPoller实例
-     * @param size EventPoller个数，如果为0则为thread::hardware_concurrency()
-     * Set the number of EventPoller instances, effective before the
-     WorkThreadPool singleton is created
-     * If this method is not called, the default is to create
-     thread::hardware_concurrency() EventPoller instances
-     * @param size The number of EventPoller instances, if 0 then use
-     thread::hardware_concurrency()
-
-     * [AUTO-TRANSLATED:bb236d87]
+     * @brief 设置EventPoller实例的数量
+     * 
+     * 此方法必须在WorkThreadPool单例创建之前调用才有效
+     * 如果不调用此方法,默认创建thread::hardware_concurrency()个EventPoller实例
+     * 
+     * @param size EventPoller实例的数量,如果为0则使用thread::hardware_concurrency()
      */
     static void setPoolSize(size_t size = 0);
 
     /**
-     * 内部创建线程是否设置cpu亲和性，默认设置cpu亲和性
-     * Whether to set CPU affinity when creating internal threads, CPU affinity
-     is set by default
-
-     * [AUTO-TRANSLATED:46941c9f]
+     * @brief 设置是否启用CPU亲和性
+     * 
+     * 控制内部创建的线程是否设置CPU亲和性,默认启用
+     * 
+     * @param enable 是否启用CPU亲和性
      */
     static void enableCpuAffinity(bool enable);
 
     /**
-     * 获取第一个实例
-     * @return
-     * Get the first instance
-     * @return
-
-     * [AUTO-TRANSLATED:a76aad3b]
+     * @brief 获取第一个EventPoller实例
+     * @return EventPoller::Ptr 第一个EventPoller实例的智能指针
      */
     EventPoller::Ptr getFirstPoller();
 
     /**
-     * 根据负载情况获取轻负载的实例
-     * 如果优先返回当前线程，那么会返回当前线程
-     * 返回当前线程的目的是为了提高线程安全性
-     * @return
-     * Get a lightly loaded instance based on the load situation
-     * If priority is given to the current thread, it will return the current
-     thread
-     * The purpose of returning the current thread is to improve thread safety
-     * @return
-
-     * [AUTO-TRANSLATED:1282b772]
+     * @brief 获取负载较轻的EventPoller实例
+     * 
+     * 根据负载情况选择一个轻负载的实例
+     * 如果当前线程已经绑定了一个EventPoller,则优先返回当前线程的实例
+     * 返回当前线程的实例可以提高线程安全性
+     * 
+     * @return EventPoller::Ptr 选中的EventPoller实例的智能指针
      */
     EventPoller::Ptr getPoller();
 
    protected:
+    /**
+     * @brief 构造函数
+     * 
+     * 构造函数被声明为protected,以支持单例模式
+     */
     WorkThreadPool();
 };
 

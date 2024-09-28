@@ -211,12 +211,17 @@ class Creator {
     ~Creator() = default;
 };
 
+/* 对象统计计数的工具类
+*  用于追踪特定类型对象的创建和销毁，从而可以统计特定类型的对象的个数
+*  每实例化一个ObjectStatistic对象，就将getCounter()的返回值instance进行++
+*  每销毁一个ObjectStatistic对象，就将getCounter()的返回值instance进行--
+*/
 template <class C>
 class ObjectStatistic {
    public:
-    ObjectStatistic() { ++getCounter(); }
+    ObjectStatistic() { ++getCounter(); }  // 对getCounter()的返回值instance进行++
 
-    ~ObjectStatistic() { --getCounter(); }
+    ~ObjectStatistic() { --getCounter(); }  // 对getCounter()的返回值instance进行--
 
     static size_t count() { return getCounter().load(); }
 
@@ -224,9 +229,13 @@ class ObjectStatistic {
     static std::atomic<size_t> &getCounter();
 };
 
+// 接受一个Type类型对象，为特定类型生成getCounter方法的特化实现, 生成一个std::atomic<size_t>类型的静态成员变量instance
+// 第一次调用时初始化instance，
 #define StatisticImp(Type)                                     \
+    // 模板参数为空，表示的时模板特化，在声明`ObjectStatistic模板类时已经特化了
     template <>                                                \
     std::atomic<size_t> &ObjectStatistic<Type>::getCounter() { \
+        // 第一次调用时初始化局部静态变量instance，后续会直接返回
         static std::atomic<size_t> instance(0);                \
         return instance;                                       \
     }
@@ -335,9 +344,6 @@ const char *strcasestr(const char *big, const char *little);
 
 /**
  * 获取时间差, 返回值单位为秒
- * Get time difference, return value in seconds
-
- * [AUTO-TRANSLATED:43d2403a]
  */
 long getGMTOff();
 
@@ -345,11 +351,6 @@ long getGMTOff();
  * 获取1970年至今的毫秒数
  * @param system_time
  是否为系统时间(系统时间可以回退),否则为程序启动时间(不可回退)
- * Get the number of milliseconds since 1970
- * @param system_time Whether it's system time (system time can be rolled back),
- otherwise it's program startup time (cannot be rolled back)
-
- * [AUTO-TRANSLATED:9857bfbe]
  */
 uint64_t getCurrentMillisecond(bool system_time = false);
 
@@ -357,11 +358,6 @@ uint64_t getCurrentMillisecond(bool system_time = false);
  * 获取1970年至今的微秒数
  * @param system_time
  是否为系统时间(系统时间可以回退),否则为程序启动时间(不可回退)
- * Get the number of microseconds since 1970
- * @param system_time Whether it's system time (system time can be rolled back),
- otherwise it's program startup time (cannot be rolled back)
-
- * [AUTO-TRANSLATED:e4bed7e3]
  */
 uint64_t getCurrentMicrosecond(bool system_time = false);
 
@@ -369,11 +365,6 @@ uint64_t getCurrentMicrosecond(bool system_time = false);
  * 获取时间字符串
  * @param fmt 时间格式，譬如%Y-%m-%d %H:%M:%S
  * @return 时间字符串
- * Get time string
- * @param fmt Time format, e.g. %Y-%m-%d %H:%M:%S
- * @return Time string
-
- * [AUTO-TRANSLATED:444636ec]
  */
 std::string getTimeStr(const char *fmt, time_t time = 0);
 
@@ -381,27 +372,16 @@ std::string getTimeStr(const char *fmt, time_t time = 0);
  * 根据unix时间戳获取本地时间
  * @param sec unix时间戳
  * @return tm结构体
- * Get local time based on Unix timestamp
- * @param sec Unix timestamp
- * @return tm structure
-
- * [AUTO-TRANSLATED:22a03a5b]
  */
 struct tm getLocalTime(time_t sec);
 
 /**
  * 设置线程名
- * Set thread name
-
- * [AUTO-TRANSLATED:d0bcbcdc]
  */
 void setThreadName(const char *name);
 
 /**
  * 获取线程名
- * Get thread name
-
- * [AUTO-TRANSLATED:99245fec]
  */
 std::string getThreadName();
 
@@ -409,32 +389,20 @@ std::string getThreadName();
  * 设置当前线程cpu亲和性
  * @param i cpu索引，如果为-1，那么取消cpu亲和性
  * @return 是否成功，目前只支持linux
- * Set current thread CPU affinity
- * @param i CPU index, if -1, cancel CPU affinity
- * @return Whether successful, currently only supports Linux
-
- * [AUTO-TRANSLATED:9b3d6a83]
  */
 bool setThreadAffinity(int i);
 
 /**
  * 根据typeid(class).name()获取类名
- * Get class name based on typeid(class).name()
-
- * [AUTO-TRANSLATED:7ac66c58]
  */
 std::string demangle(const char *mangled);
 
 /**
  * 获取环境变量内容，以'$'开头
- * Get environment variable content, starting with '$'
-
- * [AUTO-TRANSLATED:c2c1689d]
  */
 std::string getEnv(const std::string &key);
 
-// 可以保存任意的对象  [AUTO-TRANSLATED:e7c40bad]
-// Can store any object
+// 可以保存任意的对象  
 class Any {
    public:
     using Ptr = std::shared_ptr<Any>;
@@ -520,8 +488,7 @@ class Any {
     std::shared_ptr<void> _data;
 };
 
-// 用于保存一些外加属性  [AUTO-TRANSLATED:cfbc20a3]
-// Used to store some additional properties
+// 用于保存一些外加属性  
 class AnyStorage : public std::unordered_map<std::string, Any> {
    public:
     AnyStorage() = default;

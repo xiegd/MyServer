@@ -326,9 +326,13 @@ int asprintf(char **strp, const char *fmt, ...) {
 
 #endif  // WIN32
 
-static long s_gmtoff = 0;  //时间差
+// 存储GMT偏移量(秒)
+static long s_gmtoff = 0;
+
+// 使用onceToken确保初始化代码只执行一次
 static onceToken s_token([]() {
 #ifdef _WIN32
+    // Windows平台获取时区信息
     TIME_ZONE_INFORMATION tzinfo;
     DWORD dwStandardDaylight;
     long bias;
@@ -340,34 +344,48 @@ static onceToken s_token([]() {
     if (dwStandardDaylight == TIME_ZONE_ID_DAYLIGHT) {
         bias += tzinfo.DaylightBias;
     }
-    s_gmtoff = -bias * 60;  //时间差(分钟)
+    s_gmtoff = -bias * 60;  // 将分钟转换为秒
 #else
+    // 非Windows平台初始化本地时间并获取GMT偏移
     local_time_init();
     s_gmtoff = getLocalTime(time(nullptr)).tm_gmtoff;
 #endif  // _WIN32
 });
 
+// 获取GMT偏移量(秒)
 long getGMTOff() { return s_gmtoff; }
 
+// 获取当前微秒级时间戳
 static inline uint64_t getCurrentMicrosecondOrigin() {
 #if !defined(_WIN32)
-    struct timeval tv;
+    // 非Windows平台使用gettimeofday
+    /*
+     *  timeval结构体包含两个成员:
+     *  tv_sec: 自1970年1月1日以来经过的秒数
+     *  tv_usec: 当前秒的微秒数（0-999999）
+    */
+    struct timeval tv;  
     gettimeofday(&tv, nullptr);
     return tv.tv_sec * 1000000LL + tv.tv_usec;
 #else
+    // Windows平台使用chrono库
     return std::chrono::duration_cast<std::chrono::microseconds>(
                std::chrono::system_clock::now().time_since_epoch())
         .count();
 #endif
 }
 
+// 原子变量存储当前时间戳
+// 流逝时间戳，基于上次更新时间和和当前时间戳的差值计算， 不可回退 
 static atomic<uint64_t> s_currentMicrosecond(0);
 static atomic<uint64_t> s_currentMillisecond(0);
+// 系统时间戳，可能出现不连续的跳变（如系统时间被调整）, 可能回退
 static atomic<uint64_t> s_currentMicrosecond_system(
     getCurrentMicrosecondOrigin());
 static atomic<uint64_t> s_currentMillisecond_system(
     getCurrentMicrosecondOrigin() / 1000);
 
+// 初始化毫秒级时间戳更新线程
 static inline bool initMillisecondThread() {
     static std::thread s_thread([]() {
         setThreadName("stamp thread");
@@ -377,20 +395,15 @@ static inline bool initMillisecondThread() {
         uint64_t microsecond = 0;
         while (true) {
             now = getCurrentMicrosecondOrigin();
-            //记录系统时间戳，可回退  [AUTO-TRANSLATED:495a0114]
-            // Record system timestamp, can be rolled back
+            // 更新系统时间戳（可回退）, 使用memory_order_release保证线程安全
             s_currentMicrosecond_system.store(now, memory_order_release);
             s_currentMillisecond_system.store(now / 1000, memory_order_release);
 
-            //记录流逝时间戳，不可回退  [AUTO-TRANSLATED:7f3a9da3]
-            // Record elapsed timestamp, cannot be rolled back
+            // 更新流逝时间戳（不可回退）
             int64_t expired = now - last;
             last = now;
             if (expired > 0 && expired < 1000 * 1000) {
-                //流逝时间处于0~1000ms之间，那么是合理的，说明没有调整系统时间
-                //[AUTO-TRANSLATED:566e1001] If the elapsed time is between
-                // 0~1000ms, it is reasonable, indicating that the system time
-                // has not been adjusted
+                // 时间流逝正常（0~1000ms之间）
                 microsecond += expired;
                 s_currentMicrosecond.store(microsecond, memory_order_release);
                 s_currentMillisecond.store(microsecond / 1000,
@@ -398,15 +411,17 @@ static inline bool initMillisecondThread() {
             } else if (expired != 0) {
                 WarnL << "Stamp expired is abnormal: " << expired;
             }
-            //休眠0.5 ms  [AUTO-TRANSLATED:5e20acdd]
-            // Sleep for 0.5 ms
+            // 休眠0.5毫秒
             usleep(500);
         }
     });
+    // 使用onceToken确保线程只被detach一次, 
+    // detach: 从当前线程分离，允许独立运行，退出时释放资源
     static onceToken s_token([]() { s_thread.detach(); });
     return true;
 }
 
+// 获取当前毫秒级时间戳
 uint64_t getCurrentMillisecond(bool system_time) {
     static bool flag = initMillisecondThread();
     if (system_time) {
@@ -415,7 +430,12 @@ uint64_t getCurrentMillisecond(bool system_time) {
     return s_currentMillisecond.load(memory_order_acquire);
 }
 
+// 获取当前微秒级时间戳
 uint64_t getCurrentMicrosecond(bool system_time) {
+    // 这行代码的作用是确保毫秒级时间戳更新线程只被初始化一次。
+    // static 关键字保证 flag 变量只在函数首次调用时初始化。
+    // initMillisecondThread() 函数会启动一个后台线程来更新时间戳。
+    // 即使 getCurrentMicrosecond 函数被多次调用，线程也只会被创建一次。
     static bool flag = initMillisecondThread();
     if (system_time) {
         return s_currentMicrosecond_system.load(memory_order_acquire);
@@ -423,23 +443,34 @@ uint64_t getCurrentMicrosecond(bool system_time) {
     return s_currentMicrosecond.load(memory_order_acquire);
 }
 
+// 格式化时间字符串
 string getTimeStr(const char *fmt, time_t time) {
     if (!time) {
         time = ::time(nullptr);
     }
     auto tm = getLocalTime(time);
+    // 这里将结果串的长度设置为strlen(fmt) + 64是为了预留足够的空间。
+    // fmt是格式化字符串，strlen(fmt)获取其长度。
+    // 额外的64字节是为了容纳可能的日期时间值扩展。
+    // 例如，年份、月份、日期等可能会占用比格式字符串本身更多的空间。
+    // 这是一个经验值，通常足以应对大多数情况，避免缓冲区溢出。
     size_t size = strlen(fmt) + 64;
     string ret;
     ret.resize(size);
+    // strftime 函数返回写入字符串的字符数（不包括结尾的空字符）
+    // 如果结果字符串（包括结尾的空字符）超过 size 个字符，则返回0
     size = std::strftime(&ret[0], size, fmt, &tm);
     if (size > 0) {
+        // 如果成功格式化，调整字符串大小为实际写入的字符数
         ret.resize(size);
     } else {
+        // 如果格式化失败（可能是缓冲区太小），则返回原始格式字符串
         ret = fmt;
     }
     return ret;
 }
 
+// 获取本地时间结构
 struct tm getLocalTime(time_t sec) {
     struct tm tm;
 #ifdef _WIN32
