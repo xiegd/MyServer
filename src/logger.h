@@ -19,9 +19,8 @@
 #include <set>
 #include <thread>
 
-#include "List.h"
 #include "Thread/semaphore.h"
-#include "util.h"
+#include "utility.h"
 
 namespace toolkit {
 
