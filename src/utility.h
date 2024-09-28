@@ -3,6 +3,7 @@
 
 #include <list>
 #include <atomic>
+#include <functional>
 
 // 禁止拷贝的工具类，父类拷贝/赋值是delete则派生类无法生成默认的构造/赋值
 class Noncopyable {
@@ -41,6 +42,35 @@ public:
             func(t);
         }
     }
+};
+
+// 确保某个函数只执行一次
+class onceToken {
+public:
+    using task = std::function<void(void)>;
+
+    template <typename FUNC>
+    onceToken(const FUNC& onConstructed, task onDestructed = nullptr) {
+        onConstructed();
+        onDestructed_ = std::move(onDestructed);
+    }
+    onceToken(std::nullptr_t, task onDestructed = nullptr) {
+        onDestructed_ = std::move(onDestructed);
+    }
+    ~onceToken() {
+        if (onDestructed_) {
+            onDestructed_();
+        }
+    }
+
+private:
+    onceToken() = delete;
+    onceToken(const onceToken&) = delete;
+    onceToken(onceToken&&) = delete;
+    onceToken& operator=(const onceToken&) = delete;
+    onceToken& operator=(onceToken&&) = delete;
+private:
+    task onDestructed_;
 };
 
 // 对象计数器类
