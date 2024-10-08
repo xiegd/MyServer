@@ -4,6 +4,8 @@
 #include <list>
 #include <atomic>
 #include <functional>
+#include <string>
+#include <vector>
 
 // 禁止拷贝的工具类，父类拷贝/赋值是delete则派生类无法生成默认的构造/赋值
 class Noncopyable {
@@ -97,6 +99,19 @@ private:
         static std::atomic<size_t> instance(0);                \
         return instance;                                       \
     }
+
+class stringUtil {
+public:
+    static std::string& strToLower(std::string& str);
+    static std::string strToLower(std::string&& str);
+    static std::string& strToUpper(std::string& str);
+    static std::string strToUpper(std::string&& str);
+    static std::vector<std::string> split(const std::string& s, const char* delim);
+
+private:
+    stringUtil() = delete;
+    ~stringUtil() = delete;
+};
 
 #endif
 
