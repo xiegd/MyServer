@@ -266,7 +266,7 @@ void AsyncLogWriter::flushAll() {
         tmp.swap(_pending);
     }
 
-    tmp.for_each([&](std::pair<LogContextPtr, Logger *> &pr) {
+    tmp.forEach([&](std::pair<LogContextPtr, Logger *> &pr) {
         pr.second->writeChannels(pr.first);
     });
 }

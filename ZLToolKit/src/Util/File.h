@@ -8,6 +8,16 @@
  * may be found in the AUTHORS file in the root of the source tree.
  */
 
+/**
+ * @file File.h
+ * @brief 文件操作工具类
+ * 
+ * 本文件定义了一个名为 File 的工具类，提供了一系列静态方法用于文件和目录操作。
+ * 这些操作包括创建路径、创建文件、判断目录、删除文件或目录、检查文件存在性、
+ * 加载和保存文件内容、获取父目录、获取绝对路径、遍历目录、获取文件大小等功能。
+ * 该类旨在简化文件系统相关的操作，提高代码的可读性和可维护性。
+ */
+
 #ifndef SRC_UTIL_FILE_H_
 #define SRC_UTIL_FILE_H_
 
@@ -28,19 +38,19 @@
 #endif  // !PATH_MAX
 
 struct dirent {
-    long d_ino;              /* inode number*/
-    off_t d_off;             /* offset to this dirent*/
-    unsigned short d_reclen; /* length of this d_name*/
-    unsigned char d_type;    /* the type of d_name*/
-    char d_name[1];          /* file name (null-terminated)*/
+    long d_ino;              /* inode 编号 */
+    off_t d_off;             /* 到下一个 dirent 的偏移量 */
+    unsigned short d_reclen; /* d_name 的长度 */
+    unsigned char d_type;    /* d_name 的类型 */
+    char d_name[1];          /* 文件名（以 null 结尾）*/
 };
 typedef struct _dirdesc {
-    int dd_fd;    /** file descriptor associated with directory */
-    long dd_loc;  /** offset in current buffer */
-    long dd_size; /** amount of data returned by getdirentries */
-    char *dd_buf; /** data buffer */
-    int dd_len;   /** size of data buffer */
-    long dd_seek; /** magic cookie returned by getdirentries */
+    int dd_fd;    /** 与目录关联的文件描述符 */
+    long dd_loc;  /** 当前缓冲区中的偏移量 */
+    long dd_size; /** getdirentries 返回的数据量 */
+    char *dd_buf; /** 数据缓冲区 */
+    int dd_len;   /** 数据缓冲区的大小 */
+    long dd_seek; /** getdirentries 返回的魔术 cookie */
     HANDLE handle;
     struct dirent *index;
 } DIR;
@@ -63,107 +73,113 @@ struct dirent *readdir(DIR *);
 
 namespace toolkit {
 
+/**
+ * @brief 文件操作工具类
+ * 
+ * File 类提供了一系列静态方法，用于执行常见的文件和目录操作。
+ * 这些方法包括创建路径、创建文件、判断目录类型、删除文件或目录、
+ * 检查文件存在性、加载和保存文件内容、获取父目录、获取绝对路径、
+ * 遍历目录、获取文件大小等功能。
+ */
 class File {
-   public:
-    //创建路径  [AUTO-TRANSLATED:419b36b7]
-    // Create path
+public:
+    /**
+     * @brief 创建路径
+     * 
+     * @param file 要创建的路径
+     * @param mod 新创建目录的权限模式
+     * @return 如果路径创建成功返回 true，否则返回 false
+     */
     static bool create_path(const std::string &file, unsigned int mod);
 
-    //新建文件，目录文件夹自动生成  [AUTO-TRANSLATED:e605efe8]
-    // Create a new file, and the directory folder will be generated
-    // automatically
+    /**
+     * @brief 创建新文件，如果需要会自动生成目录
+     * 
+     * @param file 要创建的文件路径
+     * @param mode 文件打开模式
+     * @return 如果文件创建成功，返回文件指针；否则返回 nullptr
+     */
     static FILE *create_file(const std::string &file, const std::string &mode);
 
-    //判断是否为目录  [AUTO-TRANSLATED:639e15fa]
-    // Determine if it is a directory
+    /**
+     * @brief 判断给定路径是否为目录
+     * 
+     * @param path 要判断的路径
+     * @return 如果是目录返回 true，否则返回 false
+     */
     static bool is_dir(const std::string &path);
 
-    //判断是否是特殊目录（. or ..）  [AUTO-TRANSLATED:f61f7e33]
-    // Determine if it is a special directory (. or ..)
+    /**
+     * @brief 判断是否为特殊目录（. 或 ..）
+     * 
+     * @param path 要判断的路径
+     * @return 如果是特殊目录返回 true，否则返回 false
+     */
     static bool is_special_dir(const std::string &path);
 
-    //删除目录或文件  [AUTO-TRANSLATED:79bed783]
-    // Delete a directory or file
+    /**
+     * @brief 删除文件或目录
+     * 
+     * @param path 要删除的文件或目录的路径
+     * @param del_empty_dir 是否删除空目录
+     * @param backtrace 是否回溯删除上层空目录
+     * @return 成功返回 0，失败返回错误码
+     */
     static int delete_file(const std::string &path, bool del_empty_dir = false,
                            bool backtrace = true);
 
-    //判断文件是否存在  [AUTO-TRANSLATED:edf3cf49]
-    // Determine if a file exists
+    /**
+     * @brief 判断文件是否存在
+     * 
+     * @param path 要检查的文件路径
+     * @return 如果文件存在返回 true，否则返回 false
+     */
     static bool fileExist(const std::string &path);
 
     /**
-     * 加载文件内容至string
-     * @param path 加载的文件路径
-     * @return 文件内容
-     * Load file content to string
-     * @param path The path of the file to load
-     * @return The file content
-
-     * [AUTO-TRANSLATED:c2f0e9fa]
+     * @brief 加载文件内容到 string 中
+     * 
+     * @param path 要加载的文件路径
+     * @return 文件内容的字符串
      */
     static std::string loadFile(const std::string &path);
 
     /**
-     * 保存内容至文件
-     * @param data 文件内容
+     * @brief 保存内容到文件
+     * 
+     * @param data 要保存的内容
      * @param path 保存的文件路径
-     * @return 是否保存成功
-     * Save content to file
-     * @param data The file content
-     * @param path The path to save the file
-     * @return Whether the save was successful
-
-     * [AUTO-TRANSLATED:a919ad75]
+     * @return 保存成功返回 true，失败返回 false
      */
     static bool saveFile(const std::string &data, const std::string &path);
 
     /**
-     * 获取父文件夹
-     * @param path 路径
-     * @return 文件夹
-     * Get the parent folder
-     * @param path The path
-     * @return The folder
-
-     * [AUTO-TRANSLATED:3a584db5]
+     * @brief 获取父文件夹路径
+     * 
+     * @param path 当前路径
+     * @return 父文件夹路径
      */
     static std::string parentDir(const std::string &path);
 
     /**
-     * 替换"../"，获取绝对路径
-     * @param path 相对路径，里面可能包含 "../"
+     * @brief 替换路径中的 "../"，获取绝对路径
+     * 
+     * @param path 相对路径，可能包含 "../"
      * @param current_path 当前目录
-     * @param can_access_parent 能否访问父目录之外的目录
-     * @return 替换"../"之后的路径
-     * Replace "../" and get the absolute path
-     * @param path The relative path, which may contain "../"
-     * @param current_path The current directory
-     * @param can_access_parent Whether it can access directories outside the
-     parent directory
-     * @return The path after replacing "../"
-
-     * [AUTO-TRANSLATED:45686bfc]
+     * @param can_access_parent 是否允许访问父目录之外的目录
+     * @return 处理后的绝对路径
      */
     static std::string absolutePath(const std::string &path,
                                     const std::string &current_path,
                                     bool can_access_parent = false);
 
     /**
-     * 遍历文件夹下的所有文件
-     * @param path 文件夹路径
-     * @param cb 回调对象
-     ，path为绝对路径，isDir为该路径是否为文件夹，返回true代表继续扫描，否则中断
-     * @param enter_subdirectory 是否进入子目录扫描
-     * @param show_hidden_file 是否显示隐藏的文件
-     * Traverse all files under the folder
-     * @param path Folder path
-     * @param cb Callback object, path is the absolute path, isDir indicates
-     whether the path is a folder, returns true to continue scanning, otherwise
-     stops
-     * @param enter_subdirectory Whether to enter subdirectory scanning
-     * @param show_hidden_file Whether to display hidden files
-
-     * [AUTO-TRANSLATED:e97ab081]
+     * @brief 遍历文件夹下的所有文件
+     * 
+     * @param path 要遍历的文件夹路径
+     * @param cb 回调函数，参数为文件的绝对路径和是否为目录的标志，返回 true 继续遍历，false 停止遍历
+     * @param enter_subdirectory 是否进入子目录遍历
+     * @param show_hidden_file 是否显示隐藏文件
      */
     static void scanDir(
         const std::string &path,
@@ -171,48 +187,34 @@ class File {
         bool enter_subdirectory = false, bool show_hidden_file = false);
 
     /**
-     * 获取文件大小
+     * @brief 获取文件大小
+     * 
      * @param fp 文件句柄
-     * @param remain_size true:获取文件剩余未读数据大小，false:获取文件总大小
-     * Get file size
-     * @param fp File handle
-     * @param remain_size true: Get the remaining unread data size of the file,
-     false: Get the total file size
-
-     * [AUTO-TRANSLATED:9abfdae9]
+     * @param remain_size 如果为 true，获取文件剩余未读数据大小；如果为 false，获取文件总大小
+     * @return 文件大小（字节数）
      */
     static uint64_t fileSize(FILE *fp, bool remain_size = false);
 
     /**
-     * 获取文件大小
+     * @brief 获取文件大小
+     * 
      * @param path 文件路径
-     * @return 文件大小
+     * @return 文件大小（字节数）
      * @warning 调用者应确保文件存在
-     * Get file size
-     * @param path File path
-     * @return File size
-     * @warning The caller should ensure the file exists
-
-     * [AUTO-TRANSLATED:6985b813]
      */
     static uint64_t fileSize(const std::string &path);
 
     /**
-     * 尝试删除空文件夹
-     * @param dir 文件夹路径
-     * @param backtrace 是否回溯上层文件夹，上层文件夹为空也一并删除，以此类推
-     * Attempt to delete an empty folder
-     * @param dir Folder path
-     * @param backtrace Whether to backtrack to the upper-level folder, if the
-     upper-level folder is empty, it will also be deleted, and so on
-
-     * [AUTO-TRANSLATED:a1780506]
+     * @brief 尝试删除空文件夹
+     * 
+     * @param dir 要删除的文件夹路径
+     * @param backtrace 是否回溯删除上层空文件夹
      */
     static void deleteEmptyDir(const std::string &dir, bool backtrace = true);
 
-   private:
-    File();
-    ~File();
+private:
+    File();  // 私有构造函数，防止实例化
+    ~File(); // 私有析构函数
 };
 
 } /* namespace toolkit */

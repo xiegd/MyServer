@@ -500,8 +500,11 @@
 namespace toolkit {
 
 typedef enum {
+// XX也是一个宏，将前面定义的一系列错误码与描述进行替换
+// 比如UV_ERRNO_MAP(XX)会被展开为UV_E2BIG = UV__E2BIG,UV_EACCES = UV__EACCES,...
+// 然后这里右边的值又是前面定义的宏，对应了错误吗，所以这里的uv_errno_t宏就包含了一系列的错误码
 #define XX(code, _) UV_##code = UV__##code,
-    UV_ERRNO_MAP(XX)
+    UV_ERRNO_MAP(XX)  // 前面定义的宏，会被展开
 #undef XX
         UV_ERRNO_MAX = UV__EOF - 1
 } uv_errno_t;
@@ -509,11 +512,9 @@ typedef enum {
 const char *uv_err_name(int err);
 const char *uv_strerror(int err);
 int uv_translate_posix_error(int err);
-// netErr参数在windows平台下才有效  [AUTO-TRANSLATED:4e619bdb]
-// The netErr parameter is only valid on the Windows platform
+// netErr参数在windows平台下才有效
 int get_uv_error(bool netErr = true);
-// netErr参数在windows平台下才有效  [AUTO-TRANSLATED:4e619bdb]
-// The netErr parameter is only valid on the Windows platform
+// netErr参数在windows平台下才有效
 const char *get_uv_errmsg(bool netErr = true);
 
 }  // namespace toolkit

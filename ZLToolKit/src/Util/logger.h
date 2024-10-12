@@ -50,14 +50,10 @@ class Logger : public std::enable_shared_from_this<Logger>, public noncopyable {
 
     /**
      * 获取日志单例
-     * @return
-     * Get log singleton
-     * @return
-
-     * [AUTO-TRANSLATED:9f0d1ed7]
      */
     static Logger &Instance();
-
+    // 把构造，析构设置为public，这样shared_ptr才能正确的析构对象
+    // 否则需要自定义shared_ptr的deleter；
     explicit Logger(const std::string &loggerName);
     ~Logger();
 
@@ -270,9 +266,6 @@ class AsyncLogWriter : public LogWriter {
 ///////////////////LogChannel///////////////////
 /**
  * 日志通道
- * Log Channel
-
- * [AUTO-TRANSLATED:afbe7d5f]
  */
 class LogChannel : public noncopyable {
    public:
@@ -290,13 +283,6 @@ class LogChannel : public noncopyable {
     * @param ost 输出流
     * @param enable_color 是否启用颜色
     * @param enable_detail 是否打印细节(函数名、源码文件名、源码行)
-     * Print log to output stream
-     * @param ost Output stream
-     * @param enable_color Whether to enable color
-     * @param enable_detail Whether to print details (function name, source file
-    name, source line)
-
-     * [AUTO-TRANSLATED:54c78737]
     */
     virtual void format(const Logger &logger, std::ostream &ost,
                         const LogContextPtr &ctx, bool enable_color = true,
@@ -309,23 +295,14 @@ class LogChannel : public noncopyable {
 
 /**
  * 输出日至到广播
- * Output log to broadcast
-
- * [AUTO-TRANSLATED:ee99643f]
  */
 class EventChannel : public LogChannel {
    public:
     //输出日志时的广播名  [AUTO-TRANSLATED:2214541b]
-    // Broadcast name when outputting log
     static const std::string kBroadcastLogEvent;
     // toolkit目前仅只有一处全局变量被外部引用，减少导出相关定义，导出以下函数避免导出kBroadcastLogEvent
-    // [AUTO-TRANSLATED:71271efd] The toolkit currently only has one global
-    // variable referenced externally, reducing the export of related
-    // definitions, and exporting the following functions to avoid exporting
-    // kBroadcastLogEvent
     static const std::string &getBroadcastLogEventName();
-//日志广播参数类型和列表  [AUTO-TRANSLATED:20255585]
-// Log broadcast parameter type and list
+//日志广播参数类型和列表
 #define BroadcastLogEventArgs const Logger &logger, const LogContextPtr &ctx
 
     EventChannel(const std::string &name = "EventChannel",
@@ -337,9 +314,6 @@ class EventChannel : public LogChannel {
 
 /**
  * 输出日志至终端，支持输出日志至android logcat
- * Output logs to the terminal, supporting output to Android logcat
-
- * [AUTO-TRANSLATED:538b78dc]
  */
 class ConsoleChannel : public LogChannel {
    public:
@@ -352,9 +326,6 @@ class ConsoleChannel : public LogChannel {
 
 /**
  * 输出日志至文件
- * Output logs to a file
-
- * [AUTO-TRANSLATED:c905542e]
  */
 class FileChannelBase : public LogChannel {
    public:
@@ -382,10 +353,6 @@ class Ticker;
 /**
  * 自动清理的日志文件通道
  * 默认最多保存30天的日志
- * Auto-cleaning log file channel
- * Default to keep logs for up to 30 days
-
- * [AUTO-TRANSLATED:700cb04b]
  */
 class FileChannel : public FileChannelBase {
    public:
@@ -398,85 +365,52 @@ class FileChannel : public FileChannelBase {
      * 写日志时才会触发新建日志文件或者删除老的日志文件
      * @param logger
      * @param stream
-     * Trigger new log file creation or deletion of old log files when writing
-     logs
-     * @param logger
-     * @param stream
-
-     * [AUTO-TRANSLATED:b8e3a717]
      */
     void write(const Logger &logger, const LogContextPtr &ctx) override;
 
     /**
      * 设置日志最大保存天数
      * @param max_day 天数
-     * Set the maximum number of days to keep logs
-     * @param max_day Number of days
-
-     * [AUTO-TRANSLATED:317426b9]
      */
     void setMaxDay(size_t max_day);
 
     /**
      * 设置日志切片文件最大大小
      * @param max_size 单位MB
-     * Set the maximum size of log slice files
-     * @param max_size Unit: MB
-
-     * [AUTO-TRANSLATED:071a8ec2]
      */
     void setFileMaxSize(size_t max_size);
 
     /**
      * 设置日志切片文件最大个数
      * @param max_count 个数
-     * Set the maximum number of log slice files
-     * @param max_count Number of files
-
-     * [AUTO-TRANSLATED:74da4e7f]
      */
     void setFileMaxCount(size_t max_count);
 
    private:
     /**
      * 删除日志切片文件，条件为超过最大保存天数与最大切片个数
-     * Delete log slice files, conditions are exceeding the maximum number of
-     days and slices
-
-     * [AUTO-TRANSLATED:9ddfccec]
      */
     void clean();
 
     /**
      * 检查当前日志切片文件大小，如果超过限制，则创建新的日志切片文件
-     * Check the current log slice file size, if exceeded the limit, create a
-     new log slice file
-
-     * [AUTO-TRANSLATED:cfb08734]
      */
     void checkSize(time_t second);
 
     /**
      * 创建并切换到下一个日志切片文件
-     * Create and switch to the next log slice file
-
-     * [AUTO-TRANSLATED:dc55a521]
      */
     void changeFile(time_t second);
 
    private:
     bool _can_write = false;
-    //默认最多保存30天的日志文件  [AUTO-TRANSLATED:f16d4661]
-    // Default to keep log files for up to 30 days
+    //默认最多保存30天的日志文件
     size_t _log_max_day = 30;
-    //每个日志切片文件最大默认128MB  [AUTO-TRANSLATED:6d3efa5e]
-    // Maximum default size of each log slice file is 128MB
+    //每个日志切片文件最大默认128MB
     size_t _log_max_size = 128;
-    //最多默认保持30个日志切片文件  [AUTO-TRANSLATED:90689f74]
-    // Default to keep up to 30 log slice files
+    //最多默认保持30个日志切片文件
     size_t _log_max_count = 30;
-    //当前日志切片文件索引  [AUTO-TRANSLATED:a9894a48]
-    // Current log slice file index
+    //当前日志切片文件索引
     size_t _index = 0;
     int64_t _last_day = -1;
     time_t _last_check_time = 0;

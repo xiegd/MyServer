@@ -36,7 +36,7 @@ extern "C" const IMAGE_DOS_HEADER __ImageBase;
 #endif  // defined(_WIN32)
 
 #if defined(__MACH__) || defined(__APPLE__)
-#include <limits.h>
+#include <limits.h>  // PATH_MAX
 #include <mach-o/dyld.h> /* _NSGetExecutablePath */
 
 int uv_exepath(char *buffer, int *size) {
@@ -214,6 +214,7 @@ vector<string> split(const string &s, const char *delim) {
         last = index + strlen(delim);
         index = s.find(delim, last);
     }
+    // 如果s为空则添加一个空字符，另外处理路径最后没有后'/'的情况
     if (!s.size() || s.size() - last > 0) {
         ret.push_back(s.substr(last));
     }
@@ -483,6 +484,7 @@ struct tm getLocalTime(time_t sec) {
 
 static thread_local string thread_name;
 
+// 对于过长的name，截断并添加...
 static string limitString(const char *name, size_t max_size) {
     string str = name;
     if (str.size() + 1 > max_size) {
@@ -493,7 +495,7 @@ static string limitString(const char *name, size_t max_size) {
 }
 
 void setThreadName(const char *name) {
-    assert(name);
+    assert(name);  // 断言name不为空
 #if defined(__linux) || defined(__linux__) || defined(__MINGW32__)
     pthread_setname_np(pthread_self(), limitString(name, 16).data());
 #elif defined(__MACH__) || defined(__APPLE__)
@@ -612,10 +614,12 @@ string getThreadName() {
 #endif
 }
 
+// 设置线程的CPU亲和性, 接受一个整数参数i表示要绑定的cpu核心编号, 返回是否设置成功
 bool setThreadAffinity(int i) {
 #if (defined(__linux) || defined(__linux__)) && !defined(ANDROID)
     cpu_set_t mask;
     CPU_ZERO(&mask);
+    // i >= 0则绑定到i号cpu核心, 否则绑定到所有cpu核心
     if (i >= 0) {
         CPU_SET(i, &mask);
     } else {

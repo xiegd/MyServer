@@ -46,6 +46,12 @@
 #endif
 #endif  //__APPLE__
 
+// 用于为名为class_name的类实现线程安全的单例模式
+// 创建了一个静态的std::shared_ptr<class_name>类型的局部变量s_instance
+// 这样涉及的类必须有public的构造函数和析构函数
+// 否则如果设置为了private，shared_ptr无法delete
+// 另一种做法是使用unique_ptr，并且自定义deleter, 同时构造函数和析构函数设置为public
+// 但是就无法贡献所有权了
 #define INSTANCE_IMP(class_name, ...)                    \
     class_name &class_name::Instance() {                 \
         static std::shared_ptr<class_name> s_instance(   \
@@ -426,6 +432,16 @@ class Any {
     template <typename T, typename... ArgsType>
     void set(ArgsType &&...args) {
         _type = &typeid(T);
+        // 使用std::forward将参数完美转发给T的构造函数
+        // ...: 这里涉及到两个展开过程，ArgsType和args，
+        // 第一个展开过程是ArgsType，将多个参数展开为单个参数
+        // 第二个展开过程是args，将多个参数展开为单个参数
+        // 从而对每一个参数都使用std::forward进行完美转发
+        // std::forward<ArgsType...>(args...): 时对整个参数包调用std::forward
+        // 用于参数包时在最后加上...会对参数包中的每个参数进行完美转发
+        // 所以可以理解为forward针对参数包进行了特殊设计，在整个std::forward
+        // 表达式最后添加上'...'，可以理解为对参数包中的每一个参数进行std::forward
+        // 实际用时,T是FUNC对应的std::function类型,
         _data.reset(new T(std::forward<ArgsType>(args)...),
                     [](void *ptr) { delete (T *)ptr; });
     }
@@ -445,11 +461,17 @@ class Any {
         if (!_data) {
             throw std::invalid_argument("Any is empty");
         }
+        // 如果safe为true(安全触发事件)，并且类型不匹配，则抛出异常
+        // 由于循环中没有相应捕获std::invalid_argument异常的catch块
+        // 所以只会终止当前的迭代过程，继续执行下一次循环
         if (safe && !is<T>()) {
             throw std::invalid_argument(
                 "Any::get(): " + demangle(_type->name()) + " unable cast to " +
                 demangle(typeid(T).name()));
         }
+        // _data是一个存放了void指针的shared_ptr, 
+        // 先使用get()方法获取到其管理的指针，然后强制转换为*，
+        // 然后解引用
         return *((T *)_data.get());
     }
 
@@ -484,6 +506,8 @@ class Any {
     }
 
    private:
+    // std::type_info: 提供了运行时类型信息(RTTI)的接口， 
+    // 主要在运行时获取和比较类型信息, 使用typeid运算符获取类型信息
     const std::type_info *_type = nullptr;
     std::shared_ptr<void> _data;
 };
