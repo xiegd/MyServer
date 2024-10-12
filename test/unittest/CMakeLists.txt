@@ -8,6 +8,9 @@ project(my_project)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+set(CMAKE_BUILD_TYPE Debug)
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g")
+
 # 包含CMake的FetchContent模块，用于在配置时下载和配置外部项目
 include(FetchContent)
 # 声明一个外部项目，名称为googletest，URL为GoogleTest的GitHub仓库
@@ -21,10 +24,20 @@ set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
 
 set(OUTPUT_DIR ${CMAKE_SOURCE_DIR}/bin)
-include_directories(../../src)
+set(SOURCE_DIR ${CMAKE_SOURCE_DIR}/../../src)
+set(HEADER_DIR ${CMAKE_SOURCE_DIR})
+set(INCLUDE_DIRS "")
+list(APPEND INCLUDE_DIRS ${SOURCE_DIR}/thread ${SOURCE_DIR}/network ${SOURCE_DIR}/util)
+include_directories(${INCLUDE_DIRS})
 
-add_executable(testBuffer testBuffer.cc)
+add_executable(logger_test logger_test.cc 
+              ${SOURCE_DIR}/util/timeticker.cc
+              ${SOURCE_DIR}/util/logger.cc
+              ${SOURCE_DIR}/util/utility.cc
+              ${SOURCE_DIR}/util/file.cc
+              ${SOURCE_DIR}/util/uv_errno.cc
+              )
 
-target_link_libraries(testBuffer gtest_main)
+target_link_libraries(logger_test gtest_main)
 
-set_target_properties(testBuffer PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_DIR}) 
+set_target_properties(logger_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_DIR}) 
