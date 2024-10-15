@@ -43,7 +43,7 @@ private:
 class Ticker {
 public:
     Ticker(uint64_t min_ms = 0, 
-           LogContextCapture ctx = LogContextCapture(Logger::Instance(), LWarn,
+           LogContextCapture ctx = LogContextCapture(Logger::Instance(), LogLevel::LWarn,
                                         __FILE__, "", __LINE__), bool print_log = false);
     ~Ticker();
 public:

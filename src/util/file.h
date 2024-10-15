@@ -10,7 +10,7 @@
 namespace xkernel {
 class FileUtil {
 public:
-    static bool createPath(const std::string& file, unsigned int mod);
+    static bool createPath(const std::string& file, unsigned int mod, bool is_dir = true);
     static FILE* createFile(const std::string& file, const std::string& mode = "w");
     static bool isDir(const std::string& path);
     static bool isSpecialDir(const std::string& path);  // 是否为特殊目录（. 或 ..）

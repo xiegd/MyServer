@@ -1,11 +1,4 @@
-﻿/*
- * Copyright (c) 2016 The ZLToolKit project authors. All Rights Reserved.
- *
- * This file is part of ZLToolKit(https://github.com/ZLMediaKit/ZLToolKit).
- *
- */
-
-#include "logger.h"
+﻿#include "logger.h"
 
 #include <sys/stat.h>
 #include <unistd.h>
@@ -22,6 +15,7 @@
 
 
 namespace xkernel {
+// 设置输出到终端的日志的颜色和标签
 #define CLEAR_COLOR "\033[0m"
 static const char *LOG_CONST_TABLE[][3] = {{"\033[44;37m", "\033[34m", "T"},
                                            {"\033[42;37m", "\033[32m", "D"},
@@ -47,12 +41,12 @@ INSTANCE_IMP(Logger, ExeFile::exeName())  // 创建Logger单例
 Logger::Logger(const std::string &loggerName) {
     _logger_name = loggerName;
     _last_log = std::make_shared<LogContext>();
-    _default_channel = std::make_shared<ConsoleChannel>("default", LTrace);
+    _default_channel = std::make_shared<ConsoleChannel>("default", LogLevel::LTrace);
 }
 
 Logger::~Logger() {
-    _writer.reset();
-    { LogContextCapture(*this, LInfo, __FILE__, __FUNCTION__, __LINE__); }
+    _writer.reset();  // 确保_writer在其他操作之前关闭
+    { LogContextCapture(*this, LogLevel::LInfo, __FILE__, __FUNCTION__, __LINE__); }
     _channels.clear();
 }
 
@@ -78,6 +72,7 @@ void Logger::write(const LogContextPtr &ctx) {
     if (_writer) {
         _writer->write(ctx, *this);
     } else {
+        // logwriter为空
         writeChannels(ctx);
     }
 }
@@ -117,6 +112,7 @@ void Logger::writeChannels(const LogContextPtr &ctx) {
         }
         return;
     }
+    // 如果前一条日志重复了，则打印一条汇总日志，再继续
     if (_last_log->_repeat) {
         writeChannels_l(_last_log);
     }
@@ -149,12 +145,12 @@ const std::string &LogContext::str() {
     if (_got_content) {
         return _content;
     }
-    _content = std::ostringstream::str();
+    _content = std::ostringstream::str();  // 从std::ostringstream中获取内容
     _got_content = true;
     return _content;
 }
 
-///////////////////AsyncLogWriter///////////////////
+/////////////////LogContextCapture///////////////////
 
 static std::string s_module_name = ExeFile::exeName(false);
 
@@ -171,6 +167,8 @@ LogContextCapture::LogContextCapture(const LogContextCapture &that)
     const_cast<LogContextPtr &>(that._ctx).reset();
 }
 
+// 触发日志的实际写入操作,
+// std::endl属于std::ostream，调用下面的重载，进行实际写入, 然后清空_ctx
 LogContextCapture::~LogContextCapture() { *this << std::endl; }
 
 LogContextCapture &LogContextCapture::operator<<(std::ostream &(*f)(std::ostream &)) {
@@ -217,7 +215,7 @@ void AsyncLogWriter::flushAll() {
     decltype(_pending) tmp;
     {
         std::lock_guard<std::mutex> lock(_mutex);
-        tmp.swap(_pending);
+        tmp.swap(_pending);  // 交换tmp和_pending的内容，取出所有待写入的日志
     }
 
     tmp.forEach([&](std::pair<LogContextPtr, Logger *> &pr) {
@@ -235,6 +233,7 @@ void EventChannel::write(const Logger &logger, const LogContextPtr &ctx) {
     if (_level > ctx->_level) {
         return;
     }
+    // BroadcastLogEventArgs一整个传过去作为types
     NOTICE_EMIT(BroadcastLogEventArgs, kBroadcastLogEvent, logger, ctx);
 }
 
@@ -262,20 +261,22 @@ void SysLogChannel::write(const Logger &logger, const LogContextPtr &ctx) {
         return;
     }
     static int s_syslog_lev[10];
+    // 将自定义日志级别映射到syslog的级别
     static onceToken s_token(
         []() {
-            s_syslog_lev[LTrace] = LOG_DEBUG;
-            s_syslog_lev[LDebug] = LOG_INFO;
-            s_syslog_lev[LInfo] = LOG_NOTICE;
-            s_syslog_lev[LWarn] = LOG_WARNING;
-            s_syslog_lev[LError] = LOG_ERR;
+            s_syslog_lev[static_cast<int>(LogLevel::LTrace)] = LOG_DEBUG;
+            s_syslog_lev[static_cast<int>(LogLevel::LDebug)] = LOG_INFO;
+            s_syslog_lev[static_cast<int>(LogLevel::LInfo)] = LOG_NOTICE;
+            s_syslog_lev[static_cast<int>(LogLevel::LWarn)] = LOG_WARNING;
+            s_syslog_lev[static_cast<int>(LogLevel::LError)] = LOG_ERR;
         },
         nullptr);
 
-    syslog(s_syslog_lev[ctx->_level], "-> %s %d\r\n", ctx->_file.data(),
+    // 调用syslog将日志信息写入到系统日志
+    syslog(s_syslog_lev[static_cast<int>(ctx->_level)], "-> %s %d\r\n", ctx->_file.data(),
            ctx->_line);
-    syslog(s_syslog_lev[ctx->_level], "## %s %s | %s %s\r\n",
-           printTime(ctx->_tv).data(), LOG_CONST_TABLE[ctx->_level][2],
+    syslog(s_syslog_lev[static_cast<int>(ctx->_level)], "## %s %s | %s %s\r\n",
+           printTime(ctx->_tv).data(), LOG_CONST_TABLE[static_cast<int>(ctx->_level)][2],
            ctx->_function.data(), ctx->str().data());
 }
 
@@ -291,6 +292,7 @@ void LogChannel::setLevel(LogLevel level) { _level = level; }
 std::string LogChannel::printTime(const timeval &tv) {
     auto tm = TimeUtil::getLocalTime(tv.tv_sec);
     char buf[128];
+    // 格式化时间
     snprintf(buf, sizeof(buf), "%d-%02d-%02d %02d:%02d:%02d.%03d",
              1900 + tm.tm_year, 1 + tm.tm_mon, tm.tm_mday, tm.tm_hour,
              tm.tm_min, tm.tm_sec, (int)(tv.tv_usec / 1000));
@@ -307,11 +309,11 @@ void LogChannel::format(const Logger &logger, std::ostream &ost,
 
     if (enable_color) {
         // color console start
-        ost << LOG_CONST_TABLE[ctx->_level][1];
+        ost << LOG_CONST_TABLE[static_cast<int>(ctx->_level)][1];
     }
 
     // print log time and level
-    ost << printTime(ctx->_tv) << " " << LOG_CONST_TABLE[ctx->_level][2] << " ";
+    ost << printTime(ctx->_tv) << " " << LOG_CONST_TABLE[static_cast<int>(ctx->_level)][2] << " ";
 
     if (enable_detail) {
         // tag or process name
@@ -372,9 +374,8 @@ bool FileChannelBase::open() {
     if (_path.empty()) {
         throw std::runtime_error("Log file path must be set");
     }
-    // Open the file stream
-    _fstream.close();
-    FileUtil::createPath(_path, S_IRWXO | S_IRWXG | S_IRWXU);
+    _fstream.close();  // 关闭再打开，清除之前的状态信息
+    FileUtil::createPath(_path, S_IRWXO | S_IRWXG | S_IRWXU, false);
     _fstream.open(_path.data(), std::ios::out | std::ios::app);
     if (!_fstream.is_open()) {
         return false;
@@ -409,8 +410,7 @@ static time_t getLogFileTime(const std::string &full_path) {
     if (!strptime(name, "%Y-%m-%d", &tm)) {
         return 0;
     }
-    //此函数会把本地时间转换成GMT时间戳
-    return mktime(&tm);
+    return mktime(&tm);  //此函数会把本地时间转换成GMT时间戳
 }
 
 //获取1970年以来的第几天
@@ -481,7 +481,7 @@ void FileChannel::clean() {
     for (auto it = _log_file_map.begin(); it != _log_file_map.end();) {
         auto day = getDay(getLogFileTime(it->data()));
         if (today < day + _log_max_day) {
-            break;  // 这个日志文件距今尚未超过一定天数,后面的文件更新，所以停止遍历
+            break;  // set中元素从小到大排序，所以找到第一个大于today的元素，停止遍历
         }
         FileUtil::deleteFile(*it);  // 这个文件距今超过了一定天数，则删除文件
         it = _log_file_map.erase(it);  // 删除这条记录
@@ -522,13 +522,23 @@ void FileChannel::setMaxDay(size_t max_day) { _log_max_day = max_day > 1 ? max_d
 void FileChannel::setFileMaxSize(size_t max_size) { _log_max_size = max_size > 1 ? max_size : 1; }
 void FileChannel::setFileMaxCount(size_t max_count) { _log_max_count = max_count > 1 ? max_count : 1; }
 
-//////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////LoggerWrapper////////////////////////////////////////////////////////
 
-void LoggerWrapper::printLogV(Logger &logger, int level, const char *file,
+void LoggerWrapper::printLog(Logger &logger, LogLevel level, const char *file,
+                             const char *function, int line, const char *fmt,
+                             ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    printLogV(logger, level, file, function, line, fmt, ap);
+    va_end(ap);
+}
+
+void LoggerWrapper::printLogV(Logger &logger, LogLevel level, const char *file,
                               const char *function, int line, const char *fmt,
                               va_list ap) {
-    LogContextCapture info(logger, (LogLevel)level, file, function, line);
+    LogContextCapture info(logger, level, file, function, line);
     char *str = nullptr;
+    // 将fmt和ap格式化成字符串,存到str中
     if (vasprintf(&str, fmt, ap) >= 0 && str) {
         info << str;
 #ifdef ASAN_USE_DELETE
@@ -537,15 +547,6 @@ void LoggerWrapper::printLogV(Logger &logger, int level, const char *file,
         free(str);
 #endif
     }
-}
-
-void LoggerWrapper::printLog(Logger &logger, int level, const char *file,
-                             const char *function, int line, const char *fmt,
-                             ...) {
-    va_list ap;
-    va_start(ap, fmt);
-    printLogV(logger, level, file, function, line, fmt, ap);
-    va_end(ap);
 }
 
 } /* namespace xkernel */

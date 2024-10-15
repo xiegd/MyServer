@@ -11,12 +11,16 @@
 #include "uv_errno.h"
 
 namespace xkernel {
-bool FileUtil::createPath(const std::string& file, unsigned int mod) {
+bool FileUtil::createPath(const std::string& file, unsigned int mod, bool is_dir) {
     std::string path = file;
     std::string dir;
     size_t index = 1;
-    if (path.back() != '/') {
+    if (is_dir && path.back() != '/') {
         path.push_back('/');
+    }
+    // 处理根据文件路径创建目录的情况
+    if (!is_dir && path.back() == '/') {
+        path.pop_back();
     }
     while (true) {
         index = path.find('/', index) + 1;
