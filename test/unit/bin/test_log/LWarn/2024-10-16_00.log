@@ -1,0 +1,4 @@
+2024-10-16 12:43:11.460 W FileChannel_LWarn [logger_test] [404173-logger_test] logger_test.cc:163 TestBody | LWarn log
+2024-10-16 12:43:11.460 E FileChannel_LWarn [logger_test] [404173-logger_test] logger_test.cc:164 TestBody | LError log
+2024-10-16 14:02:46.063 W [logger_test] [418902-logger_test] logger_test.cc:163 TestBody | LWarn log
+2024-10-16 14:02:46.063 E [logger_test] [418902-logger_test] logger_test.cc:164 TestBody | LError log

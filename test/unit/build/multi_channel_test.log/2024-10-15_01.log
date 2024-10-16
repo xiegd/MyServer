@@ -1,0 +1,14 @@
+2024-10-15 22:47:49.453 E [logger_test] [82973-async log] logger.cc:516 changeFile | Failed to open log file: multi_channel_test.log/2024-10-15_00.log
+2024-10-15 22:47:49.454 I [logger_test] [82973-logger_test] logger.cc:49 ~Logger | 
+2024-10-15 22:48:33.880 I [logger_test] [83344-logger_test] logger_test.cc:176 TestBody | This should appear in both console and file
+2024-10-15 22:48:33.880 I [logger_test] [83344-logger_test] logger.cc:49 ~Logger | 
+2024-10-15 22:50:51.106 I [logger_test] [84481-logger_test] logger_test.cc:176 TestBody | This should appear in both console and file
+2024-10-15 22:50:51.107 I [logger_test] [84481-logger_test] logger.cc:49 ~Logger | 
+2024-10-15 22:51:07.307 I [logger_test] [84657-logger_test] logger_test.cc:176 TestBody | This should appear in both console and file
+2024-10-15 22:51:07.308 I [logger_test] [84657-logger_test] logger.cc:49 ~Logger | 
+2024-10-15 22:51:19.992 I [logger_test] [84808-logger_test] logger_test.cc:176 TestBody | This should appear in both console and file
+2024-10-15 22:51:19.992 I [logger_test] [84808-logger_test] logger.cc:49 ~Logger | 
+2024-10-15 22:56:10.911 I [logger_test] [87062-logger_test] logger_test.cc:176 TestBody | This should appear in both console and file
+2024-10-15 22:56:10.912 I [logger_test] [87062-logger_test] logger.cc:49 ~Logger | 
+2024-10-15 22:59:57.790 I [logger_test] [88948-logger_test] logger_test.cc:176 TestBody | This should appear in both console and file
+2024-10-15 22:59:57.791 I [logger_test] [88948-logger_test] logger.cc:49 ~Logger | 

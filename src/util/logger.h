@@ -45,6 +45,7 @@ public:
     void setLevel(LogLevel level);  // 设置所有日志通道等级
     const std::string &getName() const;  // 获取logger名
     void write(const LogContextPtr &ctx);  // 写日志
+    int getChannelCount() const { return _channels.size(); }  // 获取日志通道个数
 
 private:
     void writeChannels(const LogContextPtr &ctx);  // 写日志到各channel，仅供AsyncLogWriter调用

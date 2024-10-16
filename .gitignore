@@ -5,3 +5,5 @@
 /ZLToolKit/lib
 /test/build
 /test/unittest/build
+/.vscode
+/src/main.cc
