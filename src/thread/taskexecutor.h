@@ -25,7 +25,7 @@ public:
 public:
     void startSleep();
     void sleepWakeUp();
-    int load();  // 获取当前线程的CPU使用率
+    int load();  // 获取当前线程的CPU使用率, 
 
 private:
     struct TimeRecord {
@@ -39,7 +39,7 @@ private:
     uint64_t max_size_;  // 统计样本数量
     uint64_t max_usec_;  // 统计时间窗口大小
     std::mutex mtx_;
-    List<TimeRecord> time_list_;
+    List<TimeRecord> time_list_;  // 记录每次休眠和唤醒的时长
 };
 
 // 可取消任务的抽象基类
@@ -91,9 +91,9 @@ public:
 
 public:
     virtual Task::Ptr async(TaskIn task, bool may_sync = true) = 0;  // 异步执行
-    virtual Task::Ptr async_first(Task task, bool may_sync = true);  // 以最高优先级异步执行
+    virtual Task::Ptr asyncFirst(Task task, bool may_sync = true);  // 以最高优先级异步执行
     void sync(const TaskIn& Task);  // 同步执行
-    void sync_first(const TaskIn& Task);  // 以最高优先级同步执行
+    void syncFirst(const TaskIn& Task);  // 以最高优先级同步执行
 };
 
 class TaskExecutor : public ThreadLoadCounter, public TaskExecutorInterface {
@@ -112,7 +112,7 @@ public:
     TaskExecutorGetter() = default;
     ~TaskExecutorGetter() = default;
 public:
-    virtual TaskExector::Ptr getExecutor() = 0;
+    virtual TaskExecutor::Ptr getExecutor() = 0;
     virtual size_t getExecutorSize() const = 0;
 }
 
@@ -123,18 +123,18 @@ public:
     ~TaskExecutorGetterImpl() = default;
 
 public:
-    TaskExector::Ptr getExecutor() override;  // 获取最空闲的任务执行器
+    TaskExecutor::Ptr getExecutor() override;  // 获取最空闲的任务执行器
     size_t getExecutorSize() const override;  // 获取执行器(线程)数量
     std::vector<int> getExecutorLoad();  // 获取所有线程的负载率    
     void getExecutorDelay(const std::function<void(const std::vector<int>&)& callback);  // 获取所有线程任务执行时延
-    void forEach(const std::function<void(const TaskExector::Ptr&)>& callback);  // 遍历所有线程
+    void forEach(const std::function<void(const TaskExecutor::Ptr&)>& callback);  // 遍历所有线程
 
 protected:
     size_t addPoller(const std::string& name, size_t size, int priority,
         bool register_thread, bool enable_cpu_affinity = true);
 protected:
-    size_t thread_idx_ = 0;  // 跟踪当前选择的线程(TaskExector)索引
-    std::vector<TaskExector::Ptr> threads_;
+    size_t thread_idx_ = 0;  // 跟踪当前选择的线程(TaskExector)索引，是上一次选出的负载最小的线程
+    std::vector<TaskExecutor::Ptr> threads_;
 };
-}
+}  // namespace xkernel
 #endif
