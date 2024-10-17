@@ -159,5 +159,65 @@ bool TimeUtil::initMillisecondThread() {
     return true;
 }
 
-// Ticker::Ticker(uint64_t min_ms = 0)
+Ticker::Ticker(uint64_t min_ms = 0, LogContextCapture ctx = 
+    LogContextCapture(Logger::Instance(), LogLevel::LWarn, __FILE__, "", __LINE__), bool print_log = false) 
+    : ctx_(std::move(ctx)) {
+        if (!print_log) {
+            ctx_.clear();
+        }
+        created_ = begin_ = TimeUtil::getCurrentMillisecond();
+        min_ms_ = min_ms;
+}
+
+Ticker::~Ticker() {
+    uint64_t tm = createdTime();
+    if (tm > min_ms_) {
+        ctx_ << "take time: " << tm << "ms" << ", thread may be overloaded";
+    } else {
+        ctx_.clear();
+    }
+}
+
+uint64_t Ticker::elapsedTime() const { return TimeUtil::getCurrentMillisecond() - begin_; }
+uint64_t Ticker::createdTime() const { return TimeUtil::getCurrentMillisecond() - created_; }
+void Ticker::resetTime() { begin_ = TimeUtil::getCurrentMillisecond(); }
+
+SmoothTicker::SmoothTicker(uint64_t reset_ms = 10000) {
+    reset_ms_ = reset_ms;
+    ticker_.resetTime();
+}
+SmoothTicker::~SmoothTicker() {}
+
+uint64_t SmoothTicker::elapsedTime() { 
+    auto now_time = ticker_.elapsedTime();
+    if (first_time_ == 0) {
+        if (now_time < last_time_) {
+            auto last_time = last_time_ - time_incre_;
+            double elapse_time = (now_time - last_time);
+            time_incre_ += (elapse_time / ++pkt_count_) / 3;
+            auto ret_time = last_time + time_incre_;
+            last_time_ = static_cast<uint64_t>(ret_time);
+            return static_cast<uint64_t>(ret_time);
+        }
+        first_time_ = now_time;
+        last_time_ = now_time;
+        pkt_count_ = 0;
+        time_incre_ = 0;
+        return now_time;
+    }
+
+    auto elapse_time = (now_time - first_time_);
+    time_incre_ += elapse_time / ++pkt_count_;
+    auto ret_time = first_time_ + time_incre_;
+    if (elapse_time > reset_ms_) {
+        first_time_ = 0;
+    }
+    last_time_ = static_cast<uint64_t>(ret_time);
+    return static_cast<uint64_t>(ret_time);
+}
+void SmoothTicker::resetTime() {
+    first_time_ = 0;
+    pkt_count = 0;
+    ticker_.resetTime();
+}
 } // namespace xkernel

@@ -69,9 +69,9 @@ public:
     void resetTime();
 
 private:
-    double time_incre_ = 0;  // 时间增量，用于平滑时间戳
-    uint64_t first_time_ = 0;  // 第一次记录的时间戳
-    uint64_t last_time_ = 0;  // 上一次记录的时间戳
+    double time_incre_ = 0;  // 累计时间增量，用于平滑时间戳
+    uint64_t first_time_ = 0;  // 直接从ticker_获取的计时
+    uint64_t last_time_ = 0;  // 根据first_time_和移动平均计算的time_incre_计算得到的计时
     uint64_t pkt_count_ = 0;  // 包计数器
     uint64_t reset_ms_ = 0;  // 时间戳重置间隔(ms)
     Ticker ticker_;
