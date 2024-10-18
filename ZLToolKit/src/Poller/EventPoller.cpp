@@ -26,8 +26,7 @@
 
 #define EPOLL_SIZE 1024
 
-//防止epoll惊群  [AUTO-TRANSLATED:ad53c775]
-// Prevent epoll thundering
+//防止epoll惊群
 #ifndef EPOLLEXCLUSIVE
 #define EPOLLEXCLUSIVE 0
 #endif
@@ -288,8 +287,7 @@ Task::Ptr EventPoller::async_l(TaskIn task, bool may_sync, bool first) {
             _list_task.emplace_back(ret);
         }
     }
-    //写数据到管道,唤醒主线程  [AUTO-TRANSLATED:2ead8182]
-    // Write data to the pipe and wake up the main thread
+    //写数据到管道,唤醒主线程
     _pipe.write("", 1);
     return ret;
 }

@@ -12,6 +12,4 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # set(SRC_SYLAR)
 # list(APPEND SRC_SYLAR ../sources/log.cc)
-aux_source_directory(./src MY_CODE)
-
-add_executable(MyServer ${MY_CODE})
+add_subdirectory(./test/unittest)

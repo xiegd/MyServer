@@ -256,6 +256,13 @@ private:
     std::shared_ptr<void> _data;
 };
 
+// 用于保存一些外加属性  
+class AnyStorage : public std::unordered_map<std::string, Any> {
+public:
+    AnyStorage() = default;
+    ~AnyStorage() = default;
+    using Ptr = std::shared_ptr<AnyStorage>;
+};
 
 } // namespace xkernel
 

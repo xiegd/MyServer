@@ -21,11 +21,12 @@ using namespace std;
 namespace toolkit {
 
 ThreadLoadCounter::ThreadLoadCounter(uint64_t max_size, uint64_t max_usec) {
-    _last_sleep_time = _last_wake_time = getCurrentMicrosecond();
+    _last_sleep_time = _last_wake_time = getCurrentMicrosecond();  // 初始化休眠和唤醒时间为当前时间
     _max_size = max_size;
     _max_usec = max_usec;
 }
 
+// 线程进入休眠状态
 void ThreadLoadCounter::startSleep() {
     lock_guard<mutex> lck(_mtx);
     _sleeping = true;
@@ -61,7 +62,7 @@ int ThreadLoadCounter::load() {
             totalRunTime += rcd._time;
         }
     });
-
+    // 加上上次记录到现在的时间
     if (_sleeping) {
         totalSleepTime += (getCurrentMicrosecond() - _last_sleep_time);
     } else {
@@ -69,6 +70,7 @@ int ThreadLoadCounter::load() {
     }
 
     uint64_t totalTime = totalRunTime + totalSleepTime;
+    // 丢弃超出max_size_和max_usec_的记录
     while ((_time_list.size() != 0) &&
            (totalTime > _max_usec || _time_list.size() > _max_size)) {
         TimeRecord &rcd = _time_list.front();
@@ -94,17 +96,16 @@ Task::Ptr TaskExecutorInterface::async_first(TaskIn task, bool may_sync) {
 
 void TaskExecutorInterface::sync(const TaskIn &task) {
     semaphore sem;
+    // 异步执行task, onceToken在lambda函数执行完后析构
     auto ret = async([&]() {
         onceToken token(nullptr, [&]() {
-            //通过RAII原理防止抛异常导致不执行这句代码
-            //[AUTO-TRANSLATED:206bd80e] Prevent this code from not being
-            // executed due to an exception being thrown through RAII principle
+            // 确保无论task()是否抛异常，都会执行sem.post()
             sem.post();
         });
-        task();
+        task();  // 执行任务
     });
     if (ret && *ret) {
-        sem.wait();
+        sem.wait();  // 等待task执行完毕
     }
 }
 
@@ -112,9 +113,7 @@ void TaskExecutorInterface::sync_first(const TaskIn &task) {
     semaphore sem;
     auto ret = async_first([&]() {
         onceToken token(nullptr, [&]() {
-            //通过RAII原理防止抛异常导致不执行这句代码
-            //[AUTO-TRANSLATED:206bd80e] Prevent this code from not being
-            // executed due to an exception being thrown through RAII principle
+            // 确保无论task()是否抛异常，都会执行sem.post()
             sem.post();
         });
         task();
@@ -136,10 +135,12 @@ TaskExecutor::Ptr TaskExecutorGetterImp::getExecutor() {
     if (thread_pos >= _threads.size()) {
         thread_pos = 0;
     }
-
+    // 获取当前选择线程的cpu使用率
     TaskExecutor::Ptr executor_min_load = _threads[thread_pos];
     auto min_load = executor_min_load->load();
-
+    // 遍历所有线程，获取cpu使用率最小的线程
+    // 从thread_pos遍历，避免从头开始遍历在负载相同时
+    // 总是选择第一个线程，导致分配不均，同时对cpu缓冲更友好
     for (size_t i = 0; i < _threads.size(); ++i) {
         ++thread_pos;
         if (thread_pos >= _threads.size()) {
@@ -174,15 +175,18 @@ void TaskExecutorGetterImp::getExecutorDelay(
     const function<void(const vector<int> &)> &callback) {
     std::shared_ptr<vector<int>> delay_vec =
         std::make_shared<vector<int>>(_threads.size());
+    // 创建一个shared_ptr，这里自定义了deleter，也就是这个lambda表达式，
+    // 当析构时调用回调函数(deleter) , 把获得的所有线程时延数据传递给回调函数的参数
     shared_ptr<void> finished(nullptr, [callback, delay_vec](void *) {
         //此析构回调触发时，说明已执行完毕所有async任务
-        //[AUTO-TRANSLATED:8adf8212] When this destructor callback is triggered,
-        // it means all async tasks have been executed
         callback((*delay_vec));
     });
     int index = 0;
     for (auto &th : _threads) {
+        // 为线程创建计时器
         std::shared_ptr<Ticker> delay_ticker = std::make_shared<Ticker>();
+        // 把finished作为参数传递给异步任务，当所有任务完成后, 
+        // 在shared_ptr的计数减少到0时，会调用deleter，也就是回调函数
         th->async(
             [finished, delay_vec, index, delay_ticker]() {
                 (*delay_vec)[index] = (int)delay_ticker->elapsedTime();
@@ -202,11 +206,18 @@ void TaskExecutorGetterImp::for_each(
 size_t TaskExecutorGetterImp::getExecutorSize() const {
     return _threads.size();
 }
-
+/*
+ * 添加一组Poller线程
+ * name: 线程名
+ * size: 线程数
+ * priority: 线程优先级
+ * register_thread: 是否注册线程
+ * enable_cpu_affinity: 是否启用cpu亲和性
+ */
 size_t TaskExecutorGetterImp::addPoller(const string &name, size_t size,
                                         int priority, bool register_thread,
                                         bool enable_cpu_affinity) {
-    auto cpus = thread::hardware_concurrency();
+    auto cpus = thread::hardware_concurrency();  // 返回支持的并发线程数
     size = size > 0 ? size : cpus;
     for (size_t i = 0; i < size; ++i) {
         auto full_name = name + " " + to_string(i);
@@ -214,14 +225,11 @@ size_t TaskExecutorGetterImp::addPoller(const string &name, size_t size,
         EventPoller::Ptr poller(new EventPoller(full_name));
         poller->runLoop(false, register_thread);
         poller->async([cpu_index, full_name, priority, enable_cpu_affinity]() {
-            // 设置线程优先级  [AUTO-TRANSLATED:2966f860]
-            // Set thread priority
+            // 设置线程优先级
             ThreadPool::setPriority((ThreadPool::Priority)priority);
-            // 设置线程名  [AUTO-TRANSLATED:f5eb4704]
-            // Set thread name
+            // 设置线程名
             setThreadName(full_name.data());
-            // 设置cpu亲和性  [AUTO-TRANSLATED:ba213aed]
-            // Set CPU affinity
+            // 设置cpu亲和性
             if (enable_cpu_affinity) {
                 setThreadAffinity(cpu_index);
             }

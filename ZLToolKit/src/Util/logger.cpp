@@ -6,6 +6,7 @@
  * Use of this source code is governed by MIT license that can be found in the
  * LICENSE file in the root of the source tree. All contributing project authors
  * may be found in the AUTHORS file in the root of the source tree.
+ * 如果Logger的_channels为空，则默认使用_default_channel
  */
 
 #include "logger.h"
@@ -62,9 +63,13 @@ static const char *LOG_CONST_TABLE[][3] = {{"\033[44;37m", "\033[34m", "T"},
 Logger *g_defaultLogger = nullptr;
 
 Logger &getLogger() {
+    // 只在第一次调用的时候，创建Logger对象
+    // 后续直接返回
     if (!g_defaultLogger) {
         g_defaultLogger = &Logger::Instance();
     }
+    // 这里对Instance()返回的Logger对象取地址， 再解引用返回
+
     return *g_defaultLogger;
 }
 
@@ -75,7 +80,7 @@ void setLogger(Logger *logger) { g_defaultLogger = logger; }
 INSTANCE_IMP(Logger, exeName())
 
 Logger::Logger(const string &loggerName) {
-    _logger_name = loggerName;
+    _logger_name = loggerName;    
     _last_log = std::make_shared<LogContext>();
     _default_channel = std::make_shared<ConsoleChannel>("default", LTrace);
 

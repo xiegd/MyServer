@@ -110,10 +110,20 @@ public:
      * @brief 返回平滑的时间戳，防止由于网络抖动导致时间戳不平滑
      * 
      * @return 平滑的时间戳，单位为毫秒
+     * 处理平滑时间戳和可能出现的时间回退问题
+     * first_time_ 直接从ticker_获取的计时
+     * last_time_ 根据first_time_和移动平均计算的time_incre_计算得到的计时
+     * 二者都在进行更新，而移动平均计算的time_inc比实际的流逝时间要小
+     * 所以当last_time_ > now_time(即直接从tikcer_获取的时长), 说明发生了时间回退
+     * 此时需要修正time_inc_, 并重新计算last_time_
+     * 同时因为time_inc_随pkt_count_增加，累加的速率会越来越小，这样就无法检查回退了
+     * 所以设置了一个reset_ms_, 定期的重置first_time_, 重新开始计算
      */
     uint64_t elapsedTime() {
-        auto now_time = _ticker.elapsedTime();
+        auto now_time = _ticker.elapsedTime();  // 获取当前流逝的时长, 距离_begin
+        // 如果是首次调用，或者进行了重置, 则重新开始计算
         if (_first_time == 0) {
+            // 如果当前流逝的时长小于上一次记录的时长，说明发生时间回退，进行修正
             if (now_time < _last_time) {
                 auto last_time = _last_time - _time_inc;
                 double elapse_time = (now_time - last_time);
@@ -129,7 +139,7 @@ public:
             return now_time;
         }
 
-        auto elapse_time = (now_time - _first_time);
+        auto elapse_time = (now_time - _first_time);  //
         _time_inc += elapse_time / ++_pkt_count;
         auto ret_time = _first_time + _time_inc;
         if (elapse_time > _reset_ms) {
@@ -141,6 +151,8 @@ public:
 
     /**
      * @brief 重置时间戳为0开始
+     * 不重置_last_time和_time_inc,可以继续利用上一次的计算结果，避免时间回退
+     * 因为同时在elapsedTime中进行了重置
      */
     void resetTime() {
         _first_time = 0;

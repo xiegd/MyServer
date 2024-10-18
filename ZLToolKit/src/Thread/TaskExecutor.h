@@ -64,8 +64,8 @@ private:
     bool _sleeping = true;
     uint64_t _last_sleep_time;
     uint64_t _last_wake_time;
-    uint64_t _max_size;
-    uint64_t _max_usec;
+    uint64_t _max_size;  // 统计样本数量, 只统计最新的_max_size条记录
+    uint64_t _max_usec;  // 统计总时长，只统计距离现在<=_max_usec的这段时间
     std::mutex _mtx;
     List<TimeRecord> _time_list;
 };
@@ -179,6 +179,7 @@ using Task = TaskCancelableImp<void()>;  // 模板类实例，表示一个不接
 /**
  * @class TaskExecutorInterface
  * @brief 任务执行器接口
+ * 是一个虚基类
  */
 class TaskExecutorInterface {
 public:
@@ -190,6 +191,7 @@ public:
      * @param task 要执行的任务
      * @param may_sync 是否允许同步执行
      * @return 任务是否添加成功
+     * 纯虚函数在EvnetPoller里实现
      */
     virtual Task::Ptr async(TaskIn task, bool may_sync = true) = 0;  // 纯虚函数，抽象类
 
@@ -266,6 +268,7 @@ public:
     /**
      * @brief 获取最空闲的任务执行器
      * @return 任务执行器指针
+     * 即获取cpu使用率最小的执行器
      */
     TaskExecutor::Ptr getExecutor() override;
 
@@ -308,7 +311,7 @@ protected:
                      bool register_thread, bool enable_cpu_affinity = true);
 
 protected:
-    size_t _thread_pos = 0;
+    size_t _thread_pos = 0;  // 跟踪当前选择的线程(TaskExector)索引，是上一次选出的负载最小的线程
     std::vector<TaskExecutor::Ptr> _threads;
 };
 

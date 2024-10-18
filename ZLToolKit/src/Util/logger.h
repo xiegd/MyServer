@@ -37,95 +37,54 @@ typedef enum { LTrace = 0, LDebug, LInfo, LWarn, LError } LogLevel;
 Logger &getLogger();
 void setLogger(Logger *logger);
 
-/**
-* 日志类
- * Log class
-
- * [AUTO-TRANSLATED:3f74af09]
-*/
+// 日志单例类
 class Logger : public std::enable_shared_from_this<Logger>, public noncopyable {
    public:
     friend class AsyncLogWriter;
     using Ptr = std::shared_ptr<Logger>;
 
-    /**
-     * 获取日志单例
-     */
+    // 获取日志单例
     static Logger &Instance();
     // 把构造，析构设置为public，这样shared_ptr才能正确的析构对象
     // 否则需要自定义shared_ptr的deleter；
     explicit Logger(const std::string &loggerName);
     ~Logger();
 
-    /**
-     * 添加日志通道，非线程安全的
-     * @param channel log通道
-     * Add log channel, not thread-safe
-     * @param channel log channel
-
-     * [AUTO-TRANSLATED:4c801098]
-     */
+    // 添加日志通道，非线程安全的
     void add(const std::shared_ptr<LogChannel> &channel);
 
-    /**
-     * 删除日志通道，非线程安全的
-     * @param name log通道名
-     * Delete log channel, not thread-safe
-     * @param name log channel name
-
-     * [AUTO-TRANSLATED:fa78e18b]
-     */
+    
+    // 删除日志通道，非线程安全的
     void del(const std::string &name);
 
     /**
      * 获取日志通道，非线程安全的
      * @param name log通道名
      * @return 线程通道
-     * Get log channel, not thread-safe
-     * @param name log channel name
-     * @return log channel
-
-     * [AUTO-TRANSLATED:4fa3f6c3]
      */
     std::shared_ptr<LogChannel> get(const std::string &name);
 
     /**
      * 设置写log器，非线程安全的
      * @param writer 写log器
-     * Set log writer, not thread-safe
-     * @param writer log writer
-
-     * [AUTO-TRANSLATED:da1403f7]
      */
     void setWriter(const std::shared_ptr<LogWriter> &writer);
 
     /**
      * 设置所有日志通道的log等级
      * @param level log等级
-     * Set log level for all log channels
-     * @param level log level
-
-     * [AUTO-TRANSLATED:d064460c]
      */
     void setLevel(LogLevel level);
 
     /**
      * 获取logger名
      * @return logger名
-     * Get logger name
-     * @return logger name
-
-     * [AUTO-TRANSLATED:e0de492b]
      */
     const std::string &getName() const;
 
     /**
      * 写日志
      * @param ctx 日志信息
-     * Write log
-     * @param ctx log information
-
-     * [AUTO-TRANSLATED:4f29cde6]
      */
     void write(const LogContextPtr &ctx);
 
@@ -133,10 +92,6 @@ class Logger : public std::enable_shared_from_this<Logger>, public noncopyable {
     /**
      * 写日志到各channel，仅供AsyncLogWriter调用
      * @param ctx 日志信息
-     * Write log to each channel, only for AsyncLogWriter to call
-     * @param ctx log information
-
-     * [AUTO-TRANSLATED:caad57f4]
      */
     void writeChannels(const LogContextPtr &ctx);
     void writeChannels_l(const LogContextPtr &ctx);
@@ -152,19 +107,11 @@ class Logger : public std::enable_shared_from_this<Logger>, public noncopyable {
 ///////////////////LogContext///////////////////
 /**
 * 日志上下文
- * Log Context
-
- * [AUTO-TRANSLATED:f2805fe8]
 */
 class LogContext : public std::ostringstream {
    public:
     //_file,_function改成string保存，目的是有些情况下，指针可能会失效
-    //[AUTO-TRANSLATED:8e4b3f48] _file,_function changed to string to save, the
-    //purpose is that in some cases, the pointer may become invalid
     //比如说动态库中打印了一条日志，然后动态库卸载了，那么指向静态数据区的指针就会失效
-    //[AUTO-TRANSLATED:d5e087bc] For example, a log is printed in a dynamic
-    // library, and then the dynamic library is unloaded, so the pointer to the
-    // static data area will become invalid
     LogContext() = default;
     LogContext(LogLevel level, const char *file, const char *function, int line,
                const char *module_name, const char *flag);
@@ -189,9 +136,6 @@ class LogContext : public std::ostringstream {
 
 /**
  * 日志上下文捕获器
- * Log Context Capturer
-
- * [AUTO-TRANSLATED:3c5ddc22]
  */
 class LogContextCapture {
    public:
@@ -206,11 +150,8 @@ class LogContextCapture {
      * 输入std::endl(回车符)立即输出日志
      * @param f std::endl(回车符)
      * @return 自身引用
-     * Input std::endl (newline character) to output log immediately
-     * @param f std::endl (newline character)
-     * @return Self-reference
-
-     * [AUTO-TRANSLATED:019b9eea]
+     * 重载"<<"运算符, 参数为std::ostream &(*)(std::ostream &)的函数指针f
+     * 允许LogContextCapture对象使用`<<`运算符, 右操作数就是参数f, 而std::endl就是这个类型的
      */
     LogContextCapture &operator<<(std::ostream &(*f)(std::ostream &));
 

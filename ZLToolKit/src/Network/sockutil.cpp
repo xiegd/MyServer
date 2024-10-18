@@ -344,6 +344,7 @@ class DnsCache {
             storage = SockUtil::make_sockaddr(host, 0);
             return true;
         } catch (...) {
+            // 捕获任何异常
             auto item = getCacheDomainIP(host, expire_sec);
             if (!item) {
                 item = getSystemDomainIP(host);
@@ -372,15 +373,11 @@ class DnsCache {
         lock_guard<mutex> lck(_mtx);
         auto it = _dns_cache.find(host);
         if (it == _dns_cache.end()) {
-            //没有记录  [AUTO-TRANSLATED:e99e45df]
-            // No record
-            return nullptr;
+            return nullptr;  //没有记录
         }
         if (it->second.create_time + expireSec < time(nullptr)) {
-            //已过期  [AUTO-TRANSLATED:5dbe0c9a]
-            // Expired
             _dns_cache.erase(it);
-            return nullptr;
+            return nullptr;  //已过期
         }
         return it->second.addr_info;
     }
@@ -396,8 +393,7 @@ class DnsCache {
 
     std::shared_ptr<struct addrinfo> getSystemDomainIP(const char *host) {
         struct addrinfo *answer = nullptr;
-        //阻塞式dns解析，可能被打断  [AUTO-TRANSLATED:89c8546f]
-        // Blocking DNS resolution, may be interrupted
+        //阻塞式dns解析，可能被打断
         int ret = -1;
         do {
             ret = getaddrinfo(host, nullptr, nullptr, &answer);
@@ -510,13 +506,10 @@ static int bind_sock(int fd, const char *ifr_ip, uint16_t port, int family) {
 
 int SockUtil::connect(const char *host, uint16_t port, bool async,
                       const char *local_ip, uint16_t local_port) {
-    sockaddr_storage addr;
-    //优先使用ipv4地址  [AUTO-TRANSLATED:b7857afe]
-    // Prefer IPv4 address
+    sockaddr_storage addr;  // 通用socket地址结构体可以容纳任何类型的地址
+    //优先使用ipv4地址
     if (!getDomainIP(host, port, addr, AF_INET, SOCK_STREAM, IPPROTO_TCP)) {
-        // dns解析失败  [AUTO-TRANSLATED:1d0cd32d]
-        // DNS resolution failed
-        return -1;
+        return -1;  // dns解析失败
     }
 
     int sockfd = (int)socket(addr.ss_family, SOCK_STREAM, IPPROTO_TCP);
@@ -541,13 +534,11 @@ int SockUtil::connect(const char *host, uint16_t port, bool async,
 
     if (::connect(sockfd, (sockaddr *)&addr, get_sock_len((sockaddr *)&addr)) ==
         0) {
-        //同步连接成功  [AUTO-TRANSLATED:da143548]
-        // Synchronous connection successful
+        //同步连接成功
         return sockfd;
     }
     if (async && get_uv_error(true) == UV_EAGAIN) {
-        //异步连接成功  [AUTO-TRANSLATED:44ac1cad]
-        // Asynchronous connection successful
+        //异步连接成功
         return sockfd;
     }
     WarnL << "Connect socket to " << host << " " << port
@@ -876,8 +867,7 @@ int SockUtil::dissolveUdpSock(int fd) {
     addr.ss_family = AF_UNSPEC;
     if (-1 == ::connect(fd, (struct sockaddr *)&addr, addr_len) &&
         get_uv_error() != UV_EAFNOSUPPORT) {
-        // mac/ios时返回EAFNOSUPPORT错误  [AUTO-TRANSLATED:bbe0621c]
-        // Returns EAFNOSUPPORT error on Mac/IOS
+        // mac/ios时返回EAFNOSUPPORT错误
         WarnL << "Connect socket AF_UNSPEC failed: " << get_uv_errmsg(true);
         return -1;
     }
@@ -1238,16 +1228,14 @@ struct sockaddr_storage SockUtil::make_sockaddr(const char *host,
     struct in_addr addr;
     struct in6_addr addr6;
     if (1 == inet_pton(AF_INET, host, &addr)) {
-        // host是ipv4  [AUTO-TRANSLATED:ba5c03a7]
-        // Host is IPv4
+        // host是ipv4
         reinterpret_cast<struct sockaddr_in &>(storage).sin_addr = addr;
         reinterpret_cast<struct sockaddr_in &>(storage).sin_family = AF_INET;
         reinterpret_cast<struct sockaddr_in &>(storage).sin_port = htons(port);
         return storage;
     }
     if (1 == inet_pton(AF_INET6, host, &addr6)) {
-        // host是ipv6  [AUTO-TRANSLATED:8048db0f]
-        // Host is IPv6
+        // host是ipv6
         reinterpret_cast<struct sockaddr_in6 &>(storage).sin6_addr = addr6;
         reinterpret_cast<struct sockaddr_in6 &>(storage).sin6_family = AF_INET6;
         reinterpret_cast<struct sockaddr_in6 &>(storage).sin6_port =
