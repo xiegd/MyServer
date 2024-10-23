@@ -56,7 +56,7 @@ public:
     // 配置是否开启FD_CLOEXEC特性(多进程相关)
     static int setCloExec(int fd, bool on = true);
     // 设置socket关闭等待时间, 如果关闭时还有数据未发送完，允许等待second秒
-    static int setCloseWait(int sock, int second = 0);
+    static int setCloseWait(int fd, int second = 0);
     // 进行dns解析
     static bool getDomainIP(const char* host, uint16_t port,
                             struct sockaddr_storage& addr,
@@ -87,13 +87,13 @@ public:
     // 获取本机默认网卡ip
     static std::string getLocalIp();
     // 获取socket绑定的本地ip
-    static std::string getLocalIp(int sock);
-    // 获取socket绑定的本地端口
-    static uint16_t getLocalPort(int sock);
-    // 获取socket绑定的远端ip
-    static std::string getPeerIp(int sock);
-    // 获取socket绑定的远端端口
-    static uint16_t getPeerPort(int sock);
+    static std::string getLocalIp(int fd);
+    // 获取fdet绑定的本地端口
+    static uint16_t getLocalPort(int fd);
+    // 获取fdet绑定的远端ip
+    static std::string getPeerIp(int fd);
+    // 获取fdet绑定的远端端口
+    static uint16_t getPeerPort(int fd);
     static bool supportIpv6();
 
     static std::string inetNtoa(const struct in_addr& addr);
@@ -108,7 +108,7 @@ public:
     // 根据网卡名获取ip
     static std::string getIfrIP(const char* if_name);
     // 根据ip获取网卡名
-    static std::string getIfrName(const char* local_op);
+    static std::string getIfrName(const char* local_ip);
     // 根据网卡名获取子网掩码
     static std::string getIfrMask(const char* if_name);
     // 根据网卡名获取广播地址
@@ -117,9 +117,9 @@ public:
     static bool inSameLan(const char* src_ip, const char* dts_ip);
 
     // 判断是否为ipv4地址 
-    static bool isIpv4(const char* str);
+    static bool isIpv4(const char* host);
     // 判断是否为ipv6地址
-    static bool isIpv6(const char* str);
+    static bool isIpv6(const char* host);
 
 }
 
