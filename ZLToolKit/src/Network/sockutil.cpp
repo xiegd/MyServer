@@ -113,6 +113,7 @@ static inline bool support_ipv6_l() {
 }
 
 bool SockUtil::support_ipv6() {
+    // 静态变量, flag只初始化一次
     static auto flag = support_ipv6_l();
     return flag;
 }
@@ -130,6 +131,7 @@ std::string SockUtil::inet_ntoa(const struct sockaddr *addr) {
         case AF_INET:
             return SockUtil::inet_ntoa(((struct sockaddr_in *)addr)->sin_addr);
         case AF_INET6: {
+            // 检查ipv6地址是否是ipv4映射地址
             if (IN6_IS_ADDR_V4MAPPED(
                     &((struct sockaddr_in6 *)addr)->sin6_addr)) {
                 struct in_addr addr4;
@@ -157,13 +159,11 @@ uint16_t SockUtil::inet_port(const struct sockaddr *addr) {
     }
 }
 
+// 设置socket关闭等待时间, 如果关闭时还有数据未发送完，允许等待second秒
 int SockUtil::setCloseWait(int fd, int second) {
     linger m_sLinger;
-    //在调用closesocket()时还有数据未发送完，允许等待 [AUTO-TRANSLATED:8744ea4d]
-    // Allow waiting when calling closesocket() with data still to be sent
+    //在调用closesocket()时还有数据未发送完，允许等待 
     // 若m_sLinger.l_onoff=0;则调用closesocket()后强制关闭
-    // [AUTO-TRANSLATED:07e5d642]
-    // Force close after calling closesocket() if m_sLinger.l_onoff = 0
     m_sLinger.l_onoff = (second > 0);
     m_sLinger.l_linger = second;  //设置等待时间为x秒
     int ret = setsockopt(fd, SOL_SOCKET, SO_LINGER, (char *)&m_sLinger,
@@ -186,6 +186,7 @@ int SockUtil::setNoDelay(int fd, bool on) {
     return ret;
 }
 
+// 设置socket的SO_REUSEADDR选项
 int SockUtil::setReuseable(int fd, bool on, bool reuse_port) {
     int opt = on ? 1 : 0;
     int ret = setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (char *)&opt,
@@ -194,7 +195,7 @@ int SockUtil::setReuseable(int fd, bool on, bool reuse_port) {
         TraceL << "setsockopt SO_REUSEADDR failed";
         return ret;
     }
-#if defined(SO_REUSEPORT)
+#if defined(SO_REUSEPORT)  // 不是所有系统都支持SO_REUSEPORT
     if (reuse_port) {
         ret = setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, (char *)&opt,
                          static_cast<socklen_t>(sizeof(opt)));
@@ -255,7 +256,7 @@ int SockUtil::setKeepAlive(int fd, bool on, int interval, int idle, int times) {
 
 int SockUtil::setCloExec(int fd, bool on) {
 #if !defined(_WIN32)
-    int flags = fcntl(fd, F_GETFD);
+    int flags = fcntl(fd, F_GETFD);  // 获取fd标志
     if (flags == -1) {
         TraceL << "fcntl F_GETFD failed";
         return -1;
@@ -277,6 +278,7 @@ int SockUtil::setCloExec(int fd, bool on) {
 #endif
 }
 
+// 设置socket不触发SIG_PIPE信号
 int SockUtil::setNoSigpipe(int fd) {
 #if defined(SO_NOSIGPIPE)
     int set = 1;
@@ -336,15 +338,16 @@ class DnsCache {
         static DnsCache instance;
         return instance;
     }
-
+    // 获取域名/ip地址对应的sockaddr_storage结构体
     bool getDomainIP(const char *host, sockaddr_storage &storage,
                      int ai_family = AF_INET, int ai_socktype = SOCK_STREAM,
                      int ai_protocol = IPPROTO_TCP, int expire_sec = 60) {
         try {
+            // 如果传入的host是ip地址，可以直接转换得到sockaddr_storage结构体
             storage = SockUtil::make_sockaddr(host, 0);
             return true;
         } catch (...) {
-            // 捕获任何异常
+            // 如果传入的是域名，则进行dns解析
             auto item = getCacheDomainIP(host, expire_sec);
             if (!item) {
                 item = getSystemDomainIP(host);
@@ -375,6 +378,7 @@ class DnsCache {
         if (it == _dns_cache.end()) {
             return nullptr;  //没有记录
         }
+        // create_time + expireSec < current_time, 缓存过期
         if (it->second.create_time + expireSec < time(nullptr)) {
             _dns_cache.erase(it);
             return nullptr;  //已过期
@@ -395,8 +399,13 @@ class DnsCache {
         struct addrinfo *answer = nullptr;
         //阻塞式dns解析，可能被打断
         int ret = -1;
+        // 处理系统调用被信号中断的情况, 会返回-1，且errno被设置为EINTR
+        // getaddrinfo被信号中断时，返回-1，且errno被设置为EINTR
+        // 并不是getaddrinfo失败, 所以重新调用getaddrinfo
         do {
+            // 当getaddrinfo失败时，返回非0错误码
             ret = getaddrinfo(host, nullptr, nullptr, &answer);
+            // get_uv_error读取当前的
         } while (ret == -1 && get_uv_error(true) == UV_EINTR);
 
         if (!answer) {
@@ -406,6 +415,7 @@ class DnsCache {
         return std::shared_ptr<struct addrinfo>(answer, freeaddrinfo);
     }
 
+    // 从addrinfo链表中返回最匹配的第一个addrinfo结构体
     struct addrinfo *getPerferredAddress(struct addrinfo *answer, int ai_family,
                                          int ai_socktype, int ai_protocol) {
         auto ptr = answer;
@@ -493,6 +503,7 @@ static int bind_sock4(int fd, const char *ifr_ip, uint16_t port) {
     return 0;
 }
 
+// ifr_ip：interface request ip
 static int bind_sock(int fd, const char *ifr_ip, uint16_t port, int family) {
     switch (family) {
         case AF_INET:
@@ -504,6 +515,7 @@ static int bind_sock(int fd, const char *ifr_ip, uint16_t port, int family) {
     }
 }
 
+// 根据指定的参数创建socket并连接到指定的套接字, 默认异步连接
 int SockUtil::connect(const char *host, uint16_t port, bool async,
                       const char *local_ip, uint16_t local_port) {
     sockaddr_storage addr;  // 通用socket地址结构体可以容纳任何类型的地址
@@ -511,7 +523,7 @@ int SockUtil::connect(const char *host, uint16_t port, bool async,
     if (!getDomainIP(host, port, addr, AF_INET, SOCK_STREAM, IPPROTO_TCP)) {
         return -1;  // dns解析失败
     }
-
+    // win上返回的是uint
     int sockfd = (int)socket(addr.ss_family, SOCK_STREAM, IPPROTO_TCP);
     if (sockfd < 0) {
         WarnL << "Create socket failed: " << host;
@@ -520,13 +532,13 @@ int SockUtil::connect(const char *host, uint16_t port, bool async,
 
     setReuseable(sockfd);
     setNoSigpipe(sockfd);
-    setNoBlocked(sockfd, async);
+    setNoBlocked(sockfd, async);  // 是否异步和非阻塞有什么关系
     setNoDelay(sockfd);
     setSendBuf(sockfd);
     setRecvBuf(sockfd);
     setCloseWait(sockfd);
     setCloExec(sockfd);
-
+    // 绑定失败，关闭socket并返回-1
     if (bind_sock(sockfd, local_ip, local_port, addr.ss_family) == -1) {
         close(sockfd);
         return -1;
@@ -537,13 +549,15 @@ int SockUtil::connect(const char *host, uint16_t port, bool async,
         //同步连接成功
         return sockfd;
     }
+    // 如果同步连接失败，同时允许异步连接，同时返回的UV_EAGIN错误
+    // 代表连接操作暂时无法完成，直接返回sockfd
     if (async && get_uv_error(true) == UV_EAGAIN) {
-        //异步连接成功
+        //异步连接成功, 并不意味着已经建立成功
         return sockfd;
     }
     WarnL << "Connect socket to " << host << " " << port
           << " failed: " << get_uv_errmsg(true);
-    close(sockfd);
+    close(sockfd);  // 连接失败，关闭socket并返回-1
     return -1;
 }
 
@@ -565,9 +579,10 @@ int SockUtil::listen(const uint16_t port, const char *local_ip, int back_log) {
         return -1;
     }
 
-    //开始监听  [AUTO-TRANSLATED:4404b1a8]
-    // Start listening
+    //开始监听
     if (::listen(fd, back_log) == -1) {
+        // get_uv_errmsg() 获取系统设置的errno，一个系统调用的错误码
+        // 会保留到被另一个系统调用或库函数覆盖
         WarnL << "Listen socket failed: " << get_uv_errmsg(true);
         close(fd);
         return -1;
@@ -576,6 +591,7 @@ int SockUtil::listen(const uint16_t port, const char *local_ip, int back_log) {
     return fd;
 }
 
+// 获取socket当前发生的错误的error code
 int SockUtil::getSockError(int fd) {
     int opt;
     socklen_t optLen = static_cast<socklen_t>(sizeof(opt));
@@ -589,23 +605,27 @@ int SockUtil::getSockError(int fd) {
 
 using getsockname_type = decltype(getsockname);
 
+// 使用static修饰这个非成员函数，限制了作用域在定义他的文件中
+// 封装了获取socket地址的逻辑
 static bool get_socket_addr(int fd, struct sockaddr_storage &addr,
                             getsockname_type func) {
     socklen_t addr_len = sizeof(addr);
+    // getsockname()和getpeername()这两个函数会通过设置地址族字段，填充相应的ip地址
     if (-1 == func(fd, (struct sockaddr *)&addr, &addr_len)) {
         return false;
     }
     return true;
 }
 
+// 获取socket绑定的本地地址信息，存放到sockaddr_storage中
 bool SockUtil::get_sock_local_addr(int fd, struct sockaddr_storage &addr) {
     return get_socket_addr(fd, addr, getsockname);
 }
-
+// 获取socket绑定的远端地址信息，存放到sockaddr_stroage中
 bool SockUtil::get_sock_peer_addr(int fd, struct sockaddr_storage &addr) {
     return get_socket_addr(fd, addr, getpeername);
 }
-
+// 封装获取ip地址的逻辑
 static string get_socket_ip(int fd, getsockname_type func) {
     struct sockaddr_storage addr;
     if (!get_socket_addr(fd, addr, func)) {
@@ -613,7 +633,7 @@ static string get_socket_ip(int fd, getsockname_type func) {
     }
     return SockUtil::inet_ntoa((struct sockaddr *)&addr);
 }
-
+// 封装获取port的逻辑
 static uint16_t get_socket_port(int fd, getsockname_type func) {
     struct sockaddr_storage addr;
     if (!get_socket_addr(fd, addr, func)) {
@@ -710,46 +730,32 @@ void for_each_netAdapter_posix(FUN &&fun) {  // type: struct ifreq *
 }
 #endif  //! defined(_WIN32) && !defined(__APPLE__)
 
+// 检查ip是否为私有地址
 bool check_ip(string &address, const string &ip) {
+    // 排除回环地址和任意地址
     if (ip != "127.0.0.1" && ip != "0.0.0.0") {
-        /*获取一个有效IP
-         /* Get a valid IP
-         * [AUTO-TRANSLATED:72b34922]
-         */
+        /*获取一个有效IP*/
         address = ip;
+        // htonl()和ntohl()这两个是一样的，如果输入网络字节序，则输出主机字节序
+        // 如果输入主机字节序，则输出网络字节序
         uint32_t addressInNetworkOrder = htonl(inet_addr(ip.data()));
         if (/*(addressInNetworkOrder >= 0x0A000000 && addressInNetworkOrder <
-               0x0E000000) ||*/
+               0x0E000000) ||*/  // 主机字节序
             (addressInNetworkOrder >= 0xAC100000 &&
              addressInNetworkOrder < 0xAC200000) ||
             (addressInNetworkOrder >= 0xC0A80000 &&
              addressInNetworkOrder < 0xC0A90000)) {
-            // A类私有IP地址：  [AUTO-TRANSLATED:ef542777]
-            // A-class private IP address:
-            // 10.0.0.0～10.255.255.255  [AUTO-TRANSLATED:dbbf8c5f]
+            // A类私有IP地址：  
             // 10.0.0.0～10.255.255.255
-            // B类私有IP地址：  [AUTO-TRANSLATED:7dfef625]
-            // B-class private IP address:
-            // 172.16.0.0～172.31.255.255  [AUTO-TRANSLATED:a96262fa]
-            // 172.16.0.0～172.31.255.255
-            // C类私有IP地址：  [AUTO-TRANSLATED:dc37505e]
-            // C-class private IP address:
-            // 192.168.0.0～192.168.255.255  [AUTO-TRANSLATED:c8c47e43]
+            // B类私有IP地址：  
+            // 172.16.0.0～172.31.255.255 
+            // C类私有IP地址：  
             // 192.168.0.0～192.168.255.255
-            //如果是私有地址 说明在nat内部  [AUTO-TRANSLATED:92007abb]
-            // If it's a private address, it's inside the NAT
+            //如果是私有地址 说明在nat内部  
 
             /* 优先采用局域网地址，该地址很可能是wifi地址
              * 一般来说,无线路由器分配的地址段是BC类私有ip地址
              * 而A类地址多用于蜂窝移动网络
-             /* Prefer to use the local area network address, this address is
-             likely to be the WiFi address
-             * Generally, the address segment allocated by the wireless router
-             is a BC-class private IP address
-             * While A-class addresses are often used for cellular mobile
-             networks
-
-             * [AUTO-TRANSLATED:134ad072]
              */
             return true;
         }
@@ -858,6 +864,7 @@ int SockUtil::bindUdpSock(const uint16_t port, const char *local_ip,
     return fd;
 }
 
+// 解除一个udp套接字的连接状态
 int SockUtil::dissolveUdpSock(int fd) {
     struct sockaddr_storage addr;
     socklen_t addr_len = sizeof(addr);
@@ -865,6 +872,8 @@ int SockUtil::dissolveUdpSock(int fd) {
         return -1;
     }
     addr.ss_family = AF_UNSPEC;
+    // 尝试重新连接, 指定了AF_UNSPEC地址族，
+    // 就清除了之前的连接状态，不再与之前的远端地址绑定
     if (-1 == ::connect(fd, (struct sockaddr *)&addr, addr_len) &&
         get_uv_error() != UV_EAFNOSUPPORT) {
         // mac/ios时返回EAFNOSUPPORT错误
@@ -985,13 +994,15 @@ string SockUtil::get_ifr_mask(const char *if_name) {
 #else
     int fd;
     struct ifreq ifr_mask;
-    fd = socket(AF_INET, SOCK_STREAM, 0);
+    fd = socket(AF_INET, SOCK_STREAM, 0);  // 用来执行ioctl
     if (fd == -1) {
         WarnL << "Create socket failed: " << get_uv_errmsg(true);
         return "";
     }
     memset(&ifr_mask, 0, sizeof(ifr_mask));
+    // ncpy, 最多复制n个，剩下的用\0填充
     strncpy(ifr_mask.ifr_name, if_name, sizeof(ifr_mask.ifr_name) - 1);
+    // 使用SIOCGIFNETMASK获取子网掩码, 失败返回空
     if ((ioctl(fd, SIOCGIFNETMASK, &ifr_mask)) < 0) {
         WarnL << "ioctl SIOCGIFNETMASK on " << if_name
               << " failed: " << get_uv_errmsg(true);
@@ -999,6 +1010,7 @@ string SockUtil::get_ifr_mask(const char *if_name) {
         return "";
     }
     close(fd);
+    // 获取到的都是网络字节序需要进行转换
     return SockUtil::inet_ntoa(&(ifr_mask.ifr_netmask));
 #endif  // defined(_WIN32)
 }
@@ -1051,9 +1063,13 @@ string SockUtil::get_ifr_brdaddr(const char *if_name) {
 #endif
 }
 
+// 子网掩码网络部分全为1， 主机部分全为0
+// 通过与子网掩码的&运算，获取到ip地址的网络部分
+// 如果两个ip的网络部分相同，则说明在同一网段
 #define ip_addr_netcmp(addr1, addr2, mask) \
     (((addr1) & (mask)) == ((addr2) & (mask)))
 
+// 判断两个ip是否为同一网段
 bool SockUtil::in_same_lan(const char *myIp, const char *dstIp) {
     string mask = get_ifr_mask(get_ifr_name(myIp).data());
     return ip_addr_netcmp(inet_addr(myIp), inet_addr(dstIp),
@@ -1075,6 +1091,7 @@ static void clearMulticastAllSocketOption(int socket) {
 #endif
 }
 
+// 设置组播的ttl
 int SockUtil::setMultiTTL(int fd, uint8_t ttl) {
     int ret = -1;
 #if defined(IP_MULTICAST_TTL)
@@ -1088,6 +1105,7 @@ int SockUtil::setMultiTTL(int fd, uint8_t ttl) {
     return ret;
 }
 
+// 设置组播发送网卡
 int SockUtil::setMultiIF(int fd, const char *local_ip) {
     int ret = -1;
 #if defined(IP_MULTICAST_IF)
@@ -1103,6 +1121,7 @@ int SockUtil::setMultiIF(int fd, const char *local_ip) {
     return ret;
 }
 
+// 设置是否接收本机发出的组播包
 int SockUtil::setMultiLOOP(int fd, bool accept) {
     int ret = -1;
 #if defined(IP_MULTICAST_LOOP)
@@ -1117,6 +1136,7 @@ int SockUtil::setMultiLOOP(int fd, bool accept) {
     return ret;
 }
 
+// 加入组播
 int SockUtil::joinMultiAddr(int fd, const char *addr, const char *local_ip) {
     int ret = -1;
 #if defined(IP_ADD_MEMBERSHIP)
@@ -1134,6 +1154,7 @@ int SockUtil::joinMultiAddr(int fd, const char *addr, const char *local_ip) {
     return ret;
 }
 
+// 退出组播
 int SockUtil::leaveMultiAddr(int fd, const char *addr, const char *local_ip) {
     int ret = -1;
 #if defined(IP_DROP_MEMBERSHIP)
@@ -1156,6 +1177,7 @@ static inline void write4Byte(A &&a, B &&b) {
     memcpy(&a, &b, sizeof(a));
 }
 
+// 加入组播并只接受来自指定源端的组播数据
 int SockUtil::joinMultiAddrFilter(int fd, const char *addr, const char *src_ip,
                                   const char *local_ip) {
     int ret = -1;
@@ -1220,6 +1242,7 @@ socklen_t SockUtil::get_sock_len(const struct sockaddr *addr) {
     }
 }
 
+// 根据地址和端口号生成对应的sockaddr_storage结构体
 struct sockaddr_storage SockUtil::make_sockaddr(const char *host,
                                                 uint16_t port) {
     struct sockaddr_storage storage;
@@ -1227,6 +1250,7 @@ struct sockaddr_storage SockUtil::make_sockaddr(const char *host,
 
     struct in_addr addr;
     struct in6_addr addr6;
+    // 尝试将地址转化为网络字节序的ipv4地址
     if (1 == inet_pton(AF_INET, host, &addr)) {
         // host是ipv4
         reinterpret_cast<struct sockaddr_in &>(storage).sin_addr = addr;
@@ -1234,12 +1258,13 @@ struct sockaddr_storage SockUtil::make_sockaddr(const char *host,
         reinterpret_cast<struct sockaddr_in &>(storage).sin_port = htons(port);
         return storage;
     }
+    // 尝试将地址转化为网络字节序的ipv6地址
     if (1 == inet_pton(AF_INET6, host, &addr6)) {
         // host是ipv6
         reinterpret_cast<struct sockaddr_in6 &>(storage).sin6_addr = addr6;
         reinterpret_cast<struct sockaddr_in6 &>(storage).sin6_family = AF_INET6;
         reinterpret_cast<struct sockaddr_in6 &>(storage).sin6_port =
-            htons(port);
+            htons(port);  // 端口号需要自己转换
         return storage;
     }
     throw std::invalid_argument(string("Not ip address: ") + host);

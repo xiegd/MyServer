@@ -98,6 +98,10 @@ class BufferSock : public Buffer {
     int _addr_len = 0;                  ///< 地址结构的长度
     struct sockaddr_storage _addr;      ///< 存储套接字地址的结构
     Buffer::Ptr _buffer;                ///< 指向实际数据缓冲区的智能指针
+    // Buffer是所有缓冲区的基类, 这里构造时调用派生类的实例来初始化_buffer
+    // 向上转型是安全的，因为派生类实现了基类的所有纯虚函数，当buffer_调用基类的纯虚函数时，
+    // 实际调用的是派生类重写的函数(动态绑定), 但是只能访问基类中定义了的成员，要访问派生类中定义的成员，
+    // 需要使用dynamic_cast进行向下转型
 };
 
 /**

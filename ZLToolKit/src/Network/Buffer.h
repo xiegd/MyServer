@@ -152,6 +152,8 @@ private:
      * std::enable_if<T> 用于在编译时进行条件判断，根据条件启用/禁用模板函数
      */
     template <typename T>
+    // 下面这句是函数的修饰符和返回值，typename把后面的一串是作为类型, 如果满足enable_if<C, T>的条件则为类型T
+    // ::type是在std::enable_if模板类中定义的类型别名，表示的是前面模板中的第二个参数T
     // 如果::toolkit::is_pointer<T>::value为true，则std::enable_if模板类定义一个类型别名 const T&;
     // type是在std::enable_if模板类中定义的类型别名，表示的是前面模板中的第二个参数T
     // ::value直接获取std::true_type或std::false_type模板类中定义的静态常量，是一个bool值，表示是否启用模板函数
