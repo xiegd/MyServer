@@ -43,6 +43,15 @@ SocketRecvBuffer::Ptr SocketRecvBuffer::create(bool is_udp) {
     return std::make_shared<SocketRecvFromBuffer>(kPacketCount * kBufferCapacity);
 }
 
+///////////////////////////////////// BufferList //////////////////////////////////////
+
+BufferList::Ptr BufferList::create(List<std::pair<Buffer::Ptr, boll>> list, SendResult cb, bool is_udp) {
+    if (is_udp) {
+        return std::make_shared<BufferSendMMsg>(std::move(list), std::move(cb));
+    }
+    return std::make_shared<BufferSendMsg>(std::move(list), std::move(cb));
+}
+
 ///////////////////////////////////// BufferCallBack //////////////////////////////////////
 
 BufferCallBack::BufferCallBack(List<std::pair<Buffer:Ptr, bool>> list, BufferList::SendResult cb)
@@ -310,6 +319,7 @@ ssize_t SocketRecvmmsgBuffer::recvFromSocket(int fd, ssize_t& count) {
         }
     }
     do {
+        // 将接收到的count条消息依次存到mmsgs_数组中
         count = recvmmsg(fd, &mmsgs_[0], mmsgs_.size(), 0, nullptr);
     } while (-1 == count && UV_EINTR == get_uv_error(true));
 
@@ -319,6 +329,7 @@ ssize_t SocketRecvmmsgBuffer::recvFromSocket(int fd, ssize_t& count) {
     }
 
     ssize_t nread = 0;
+    // 根据接收消息的总数更新相应的缓冲区
     for (auto i = 0u; i < count; ++i) {
         auto& mmsg = mmsgs_[i];
         nread += mmsg.msg_len;

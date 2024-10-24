@@ -1,7 +1,14 @@
 /*
- * buffersock.h
- * 
- */
+*  该文件封装了socket中的发送/接收数据的系统调用
+*  BufferSock: 封装目标地址和相应的buffer, udp需要指定目的地址
+*  BufferList: 封装了对缓冲区列表的操作的基类, send(), size(), empty()
+*  BufferCallBack: 封装对缓冲区列表的操作, 根据发送的结果，调整List中的内容
+*  BufferSendMsg: sendmsg()
+*  BufferSendTo: sendto()/send()
+*  BufferSendMMsg: sendmmsg()
+*  SocketRecvFromBuffer: recvfrom()
+*  SocketRecvmmsgBuffer: recvmmsg()
+*/
 
 #ifndef _BUFFERSOCK_H_
 #define _BUFFERSOCK_H_
@@ -22,10 +29,10 @@
 
 namespace xkernel {
 
-// 封装socket信息和相应的buffer
-class BuffferSock : public Buffer {
+// 封装目标地址和相应的buffer
+class BufferSock : public Buffer {
 public:
-    using Ptr = std::shared_ptr<BuffferSock>;
+    using Ptr = std::shared_ptr<BufferSock>;
 
     BufferSock(Buffer::Ptr ptr, struct sockaddr *addr = nullptr, int addr_len = 0);
     ~BufferSock() override = default;
@@ -143,8 +150,8 @@ public:
     ssize_t send(int fd, int flags) override;
 
 private:
-    void reOffset(size_t n);
     ssize_t send_l(int fd, int flags);
+    void reOffset(size_t n);
 
 private:
     size_t remain_size_ = 0;
