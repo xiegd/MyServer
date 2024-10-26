@@ -78,31 +78,62 @@ void get_addr_info(const char* ip, const struct addrinfo* hints) {
     freeaddrinfo(res);
 }
 
+void printBytes(const char* label, uint32_t value) {
+    std::cout << label << ": 0x" << std::hex << std::setfill('0') << std::setw(8) << value
+              << " (";
+    for (int i = 0; i < 4; ++i) {
+        std::cout << std::dec << ((value >> (i * 8)) & 0xFF);
+        if (i < 3) std::cout << ".";
+    }
+    std::cout << ")" << std::endl;
+}
+
 int main() {
-    const char* ip = "www.baidu.com";
+    // const char* ip = "www.baidu.com";
 
-    std::cout << "1. No hints specified:" << std::endl;
-    get_addr_info(ip, NULL);
+    // std::cout << "1. No hints specified:" << std::endl;
+    // get_addr_info(ip, NULL);
 
-    struct addrinfo hints;
-    memset(&hints, 0, sizeof hints);
+    // struct addrinfo hints;
+    // memset(&hints, 0, sizeof hints);
 
-    std::cout << "2. IPv4 only:" << std::endl;
-    hints.ai_family = AF_INET;
-    get_addr_info(ip, &hints);
+    // std::cout << "2. IPv4 only:" << std::endl;
+    // hints.ai_family = AF_INET;
+    // get_addr_info(ip, &hints);
 
-    std::cout << "3. IPv6 only:" << std::endl;
-    hints.ai_family = AF_INET6;
-    get_addr_info(ip, &hints);
+    // std::cout << "3. IPv6 only:" << std::endl;
+    // hints.ai_family = AF_INET6;
+    // get_addr_info(ip, &hints);
 
-    std::cout << "4. TCP only:" << std::endl;
-    hints.ai_family = AF_UNSPEC;
-    hints.ai_socktype = SOCK_STREAM;
-    get_addr_info(ip, &hints);
+    // std::cout << "4. TCP only:" << std::endl;
+    // hints.ai_family = AF_UNSPEC;
+    // hints.ai_socktype = SOCK_STREAM;
+    // get_addr_info(ip, &hints);
 
-    std::cout << "5. UDP only:" << std::endl;
-    hints.ai_socktype = SOCK_DGRAM;
-    get_addr_info(ip, &hints);
+    // std::cout << "5. UDP only:" << std::endl;
+    // hints.ai_socktype = SOCK_DGRAM;
+    // get_addr_info(ip, &hints);
+
+    // 测试16位整数
+    uint16_t host_short = 0x1234;
+    uint16_t net_short = htons(host_short);
+    uint16_t back_to_host_short = htons(net_short);
+
+    std::cout << "16-bit integer test:" << std::endl;
+    std::cout << "Original: 0x" << std::hex << host_short << std::endl;
+    std::cout << "After htons: 0x" << std::hex << net_short << std::endl;
+    std::cout << "After ntohs: 0x" << std::hex << back_to_host_short << std::endl;
+    std::cout << std::endl;
+
+    // 测试32位整数
+    uint32_t host_long = 0x12345678;
+    uint32_t net_long = htonl(host_long);
+    uint32_t back_to_host_long = htonl(net_long);
+
+    std::cout << "32-bit integer test:" << std::endl;
+    printBytes("Original", host_long);
+    printBytes("After htonl", net_long);
+    printBytes("After ntohl", back_to_host_long);
 
     return 0;
 }

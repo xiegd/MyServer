@@ -70,6 +70,7 @@ class SockUtil {
      * @param local_ip 要绑定的本地网卡IP地址
      * @param local_port 要绑定的本地端口号
      * @return 成功返回socket文件描述符，失败返回-1
+     * :: 表示默认使用任意地址
      */
     static int connect(const char *host, uint16_t port, bool async = true,
                        const char *local_ip = "::", uint16_t local_port = 0);

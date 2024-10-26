@@ -1,3 +1,11 @@
+/*
+ * 定义了socket中发送/接收数据时使用的缓冲区
+ * 设计了三种缓冲区：
+ * 1. Buffer: 抽象基类，定义了缓冲区的基本接口
+ * 2. BufferOffset<C>: 基于偏移量的缓冲区实现
+ * 3. BufferRaw: 原始缓冲区实现, 基于char*
+ * 4. BufferLikeString: 类似于string的缓冲区实现, 基于std::string
+*/
 #ifndef _BUFFER_H_
 #define _BUFFER_H_
 
@@ -72,7 +80,7 @@ private:
         size_ = size;
         offset_ = offset;
     }
-    // 获取指针的静态模板函数
+    // 获取指针的静态模板函数, 如果T是指针， 直接返回constT&, 不是就取地址返回const T*
     template <typename T>
     static typename std::enable_if<is_pointer<T>::value, const T&>::type
     getPointer(const T& data) { return data; }
@@ -93,6 +101,8 @@ using BufferString = BufferOffset<std::string>;
 class BufferRaw : public Buffer {
 public:
     using Ptr = std::shared_ptr<BufferRaw>;
+
+    static Ptr create() { return Ptr(new BufferRaw); }
     
     ~BufferRaw() override {
         if (data_) {
@@ -320,5 +330,5 @@ StatisticImpl(Buffer)
 StatisticImpl(BufferString)
 StatisticImpl(BufferRaw) 
 StatisticImpl(BufferLikeString)
-}
+}  // namespace xkernel
 #endif

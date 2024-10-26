@@ -8,6 +8,7 @@
 *  BufferSendMMsg: sendmmsg()
 *  SocketRecvFromBuffer: recvfrom()
 *  SocketRecvmmsgBuffer: recvmmsg()
+* BufferList和BufferCallBack可以重构到一起
 */
 
 #ifndef _BUFFERSOCK_H_

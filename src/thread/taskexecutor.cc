@@ -7,7 +7,7 @@
 #include "eventpoller.h"
 
 namespace xkernel {
-//----------------------ThreadLoadCounter---------------------------------
+///////////////////////////// ThreadLoadCounter /////////////////////////////////
 
 ThreadLoadCounter::ThreadLoadCounter(uint64_t max_size, uint64_t max_usec) 
     : max_size_(max_size), max_usec_(max_usec) {
@@ -71,7 +71,7 @@ int ThreadLoadCounter::load() {
     return static_cast<int>(total_run_time * 100 / total_time);
 }
 
-//----------------------TaskExecutorInterface---------------------------------
+//////////////////////// TaskExecutorInterface /////////////////////////////////
 
 Task::Ptr TaskExecutorInterface::asyncFirst(TaskIn task, bool may_sync) {
     return async(std::move(task), may_sync);
@@ -99,12 +99,12 @@ void TaskExecutorInterface::syncFirst(const TaskIn& task) {
     }
 }
 
-//----------------------TaskExecutor---------------------------------
+/////////////////////////////// TaskExecutor //////////////////////////////////////
 
 TaskExecutor::TaskExecutor(uint64_t max_size, uint64_t max_usec) 
     : ThreadLoadCounter(max_size, max_usec) {}
 
-//----------------------TaskExecutorGetterImpl---------------------------------
+//////////////////////// TaskExecutorGetterImpl /////////////////////////////////
 
 TaskExecutor::Ptr TaskExecutorGetterImpl::getExecutor() {
     auto thread_idx = thread_idx_;
