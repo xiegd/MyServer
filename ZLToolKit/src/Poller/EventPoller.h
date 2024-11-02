@@ -1,11 +1,11 @@
 ﻿/*
- * Copyright (c) 2016 The ZLToolKit project authors. All Rights Reserved.
+ * EventPoller: 时间轮询器
  *
- * This file is part of ZLToolKit(https://github.com/ZLMediaKit/ZLToolKit).
+ * 
  *
- * Use of this source code is governed by MIT license that can be found in the
- * LICENSE file in the root of the source tree. All contributing project authors
- * may be found in the AUTHORS file in the root of the source tree.
+ * 
+ * 
+ * 
  */
 
 #ifndef EventPoller_h
@@ -21,6 +21,7 @@
 
 #include "Network/Buffer.h"
 #include "Network/BufferSock.h"
+// 使用PipeWrap+Pipe两个文件分别实现，解决相互依赖的问题
 #include "PipeWrap.h"
 #include "Thread/TaskExecutor.h"
 #include "Thread/ThreadPool.h"
@@ -60,10 +61,10 @@ class EventPoller : public TaskExecutor,
      * @brief 事件类型枚举
      */
     typedef enum {
-        Event_Read = 1 << 0,   ///< 读事件
-        Event_Write = 1 << 1,  ///< 写事件
-        Event_Error = 1 << 2,  ///< 错误事件
-        Event_LT = 1 << 3,     ///< 水平触发
+        Event_Read = 1 << 0,   ///< 读事件, 对应EPOLLIN, 0x001
+        Event_Write = 1 << 1,  ///< 写事件, 对应EPOLLOUT, 0x004
+        Event_Error = 1 << 2,  ///< 错误事件, 对应EPOLLHUP | EPOLLERR, 0x008
+        Event_LT = 1 << 3,     ///< 水平触发, 对应EPOLLET, 0x010
     } Poll_Event;
 
     /**
@@ -239,13 +240,14 @@ class EventPoller : public TaskExecutor,
     std::unordered_map<int, Poll_Record::Ptr> _event_map;  ///< 事件回调映射
 #endif  // HAS_EPOLL
     std::unordered_set<int> _event_cache_expired;  ///< 过期事件缓存
-
-    std::multimap<uint64_t, DelayTask::Ptr> _delay_task_map;  ///< 定时任务映射
+    // 定时任务映射, 按时间自动排序，有序， multimap会自动按key进行升序排序，对于自定义类型需要指定比较方式
+    std::multimap<uint64_t, DelayTask::Ptr> _delay_task_map;  
 };
 
 /**
  * @class EventPollerPool
  * @brief 事件轮询器池类，管理多个EventPoller实例
+ * 单例类
  */
 class EventPollerPool : public std::enable_shared_from_this<EventPollerPool>,
                         public TaskExecutorGetterImp {

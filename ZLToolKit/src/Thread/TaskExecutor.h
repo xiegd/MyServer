@@ -312,7 +312,7 @@ protected:
 
 protected:
     size_t _thread_pos = 0;  // 跟踪当前选择的线程(TaskExector)索引，是上一次选出的负载最小的线程
-    std::vector<TaskExecutor::Ptr> _threads;
+    std::vector<TaskExecutor::Ptr> _threads;  // event poller pool
 };
 
 }  // namespace toolkit

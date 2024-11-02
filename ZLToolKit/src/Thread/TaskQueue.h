@@ -61,6 +61,7 @@ class TaskQueue {
      * @brief 清空任务队列
      * 
      * @param n 要清空的任务数量
+     * 唤醒正在等待的任务线程，但是不再添加任务到队列
      */
     void push_exit(size_t n) { _sem.post(n); }
 

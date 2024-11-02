@@ -15,7 +15,7 @@ namespace toolkit {
 static size_t s_pool_size = 0;
 static bool s_enable_cpu_affinity = true;
 
-INSTANCE_IMP(WorkThreadPool)
+INSTANCE_IMP(WorkThreadPool)  // 实现了Instance方法的宏函数
 
 EventPoller::Ptr WorkThreadPool::getFirstPoller() {
     return std::static_pointer_cast<EventPoller>(_threads.front());
@@ -26,8 +26,7 @@ EventPoller::Ptr WorkThreadPool::getPoller() {
 }
 
 WorkThreadPool::WorkThreadPool() {
-    //最低优先级  [AUTO-TRANSLATED:cd1f0dbc]
-    // Lowest priority
+    //最低优先级  
     addPoller("work poller", s_pool_size, ThreadPool::PRIORITY_LOWEST, false,
               s_enable_cpu_affinity);
 }

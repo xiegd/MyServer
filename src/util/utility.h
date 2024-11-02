@@ -11,6 +11,7 @@
 #include <condition_variable>
 #include <typeinfo>
 #include <cxxabi.h>
+#include <sstream>
 
 namespace xkernel {
 // 禁止拷贝的工具类，父类拷贝/赋值是delete则派生类无法生成默认的构造/赋值
@@ -262,6 +263,27 @@ public:
     AnyStorage() = default;
     ~AnyStorage() = default;
     using Ptr = std::shared_ptr<AnyStorage>;
+};
+
+// 继承自std::string，用于拼接字符串
+#define StrPrinter ::xkernel::_StrPrinter()
+class _StrPrinter : public std::string {
+public:
+    _StrPrinter() {}
+
+    template <typename T>
+    _StrPrinter& operator<<(T&& data) {
+        stream_ << std::forward<T>(data);
+        this->std::string::operator=(stream_.str());
+        return *this;
+    }
+
+    std::string operator<<(std::ostream& (*f)(std::ostream&)) const {
+        return *this;
+    }
+
+private:
+    std::stringstream stream_;
 };
 
 } // namespace xkernel

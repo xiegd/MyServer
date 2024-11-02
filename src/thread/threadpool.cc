@@ -51,11 +51,11 @@ size_t ThreadGroup::size() { return threads_.size(); }
 
 //////////////////////////////////// ThreadPool //////////////////////////////////////
 
-ThreadPool::ThreadPool(int num, Priority priority, bool auto_run, 
+ThreadPool::ThreadPool(int num, Thread_Priority priority, bool auto_run, 
                        bool set_affinity, const std::string& pool_name) {
     thread_num_ = num;
     on_setup_ = [pool_name, priority, set_affinity](int index) {
-        std::string name = pool_name + '' + std::to_string(index);
+        std::string name = pool_name + " " + std::to_string(index);
         setPriority(priority);
         ThreadUtil::setThreadName(name.data());
         if (set_affinity) {
@@ -95,7 +95,7 @@ Task::Ptr ThreadPool::async_first(TaskIn task, bool may_sync = true) {
 
 size_t ThreadPool::size() { return queue_.size(); }
 
-bool ThreadPool::setPriority(Priority priority, std::thread::native_handle_type threadId) {
+bool ThreadPool::setPriority(Thread_Priority priority, std::thread::native_handle_type threadId) {
     static int Min = sched_get_priority_min(SCHED_FIFO);  // 获取SCHED_FIFO调度策略的最小优先级
     if (Min == -1) {
         return false;
@@ -121,7 +121,7 @@ void ThreadPool::start() {
     }
     size_t total = thread_num_ - thread_group_.size();
     for (size_t i = 0; i < total; ++i) {
-        thread_group_.create_thread([this, i](){ run(i); })
+        thread_group_.createThread([this, i](){ run(i); })
     }
 }
 
@@ -144,9 +144,9 @@ void ThreadPool::run(size_t index) {
 }
 
 void ThreadPool::wait() { thread_group_.joinAll(); }
-void ThreadPool::shutdown() { queue_.push_exit(thread_num_); }
+void ThreadPool::shutdown() { queue_.pushExit(thread_num_); }
 
-//////////////////////////////////// ThreadPool //////////////////////////////////////
+//////////////////////////////////// WorkThreadPool //////////////////////////////////////
 
 static size_t s_pool_size = 0;
 static bool s_enable_cpu_affinity = true;

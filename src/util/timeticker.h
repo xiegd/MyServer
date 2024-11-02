@@ -76,5 +76,16 @@ private:
     uint64_t reset_ms_ = 0;  // 时间戳重置间隔(ms)
     Ticker ticker_;
 };
+
+// 在debug模式下统计代码执行时间的宏
+#if !defined(NDEBUG)
+#define TimeTicker() Ticker __ticker{5, WarnL, true}
+#define TimeTicker1(tm) Ticker __ticker1{tm, WarnL, true}
+#define TimeTicker2(tm, log) Ticker __ticker2{tm, log, true}
+#else
+#define TimeTicker()
+#define TimeTicker1(tm)
+#define TimeTicker2(tm, log)
+#endif
 } // namespace xkernel
 #endif

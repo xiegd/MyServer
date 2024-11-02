@@ -17,6 +17,9 @@
 #include "utility.h"
 
 namespace xkernel {
+
+enum class Thread_Priority : int;
+
 class ThreadLoadCounter {
 public:
     ThreadLoadCounter(uint64_t max_size, uint64_t max_usec);
@@ -32,7 +35,7 @@ private:
         TimeRecord(uint64_t tm, bool slp) : time_(tm), sleep_(slp) {}
         bool sleep_;
         uint64_t time_;
-    }
+    };
     bool sleeping_ = true;
     uint64_t last_sleep_time_;  // 上一次休眠时间
     uint64_t last_wake_time_;  // 上一次唤醒时间
@@ -74,6 +77,27 @@ public:
     void cancel() override {
         strongTask_ = nullptr; // 引用计数减1
     }
+
+    operator bool() { return strongTask_ && *strongTask_; }
+    void operator=(std::nullptr_t) { strongTask_ = nullptr; }
+
+    R operator()(ArgTypes... args) const {
+        auto strongTask = weakTask_.lock();
+        if (strongTask && *strongTask) {
+            return (*strongTask)(std::forward<ArgTypes>(args)...);
+        }
+        return defaultValue<R>();
+    }
+
+    template <typename T>
+    static typename std::enable_if<std::is_void<T>::value, void>::type defaultValue() {}
+
+    template <typename T>
+    static typename std::enable_if<std::is_pointer<T>::value, T>::type defaultValue() { return nullptr; }
+
+    template <typename T>
+    static typename std::enable_if<std::is_integral<T>::value, T>::type defaultValue() { return 0; }
+
     
 protected:
     std::weak_ptr<func_type> weakTask_;
@@ -91,9 +115,9 @@ public:
 
 public:
     virtual Task::Ptr async(TaskIn task, bool may_sync = true) = 0;  // 异步执行
-    virtual Task::Ptr asyncFirst(Task task, bool may_sync = true);  // 以最高优先级异步执行
-    void sync(const TaskIn& Task);  // 同步执行
-    void syncFirst(const TaskIn& Task);  // 以最高优先级同步执行
+    virtual Task::Ptr asyncFirst(TaskIn task, bool may_sync = true);  // 以最高优先级异步执行
+    void sync(const TaskIn& task);  // 同步执行
+    void syncFirst(const TaskIn& task);  // 以最高优先级同步执行
 };
 
 class TaskExecutor : public ThreadLoadCounter, public TaskExecutorInterface {
@@ -102,7 +126,7 @@ public:
 
     TaskExecutor(uint64_t max_size = 32, uint64_t max_usec = 2 * 1000 * 1000);
     ~TaskExecutor() = default;
-}
+};
 
 // 任务执行器获取接口
 class TaskExecutorGetter {
@@ -110,11 +134,11 @@ public:
     using Ptr = std::shared_ptr<TaskExecutorGetter>;
 
     TaskExecutorGetter() = default;
-    ~TaskExecutorGetter() = default;
+    virtual ~TaskExecutorGetter() = default;
 public:
     virtual TaskExecutor::Ptr getExecutor() = 0;
     virtual size_t getExecutorSize() const = 0;
-}
+};
 
 // 任务执行器获取接口的实现类
 class TaskExecutorGetterImpl : public TaskExecutorGetter {
@@ -126,11 +150,11 @@ public:
     TaskExecutor::Ptr getExecutor() override;  // 获取最空闲的任务执行器
     size_t getExecutorSize() const override;  // 获取执行器(线程)数量
     std::vector<int> getExecutorLoad();  // 获取所有线程的负载率    
-    void getExecutorDelay(const std::function<void(const std::vector<int>&)& callback);  // 获取所有线程任务执行时延
+    void getExecutorDelay(const std::function<void(const std::vector<int>&)>& callback);  // 获取所有线程任务执行时延
     void forEach(const std::function<void(const TaskExecutor::Ptr&)>& callback);  // 遍历所有线程
 
 protected:
-    size_t addPoller(const std::string& name, size_t size, int priority,
+    size_t addPoller(const std::string& name, size_t size, Thread_Priority priority,
         bool register_thread, bool enable_cpu_affinity = true);
 protected:
     size_t thread_idx_ = 0;  // 跟踪当前选择的线程(TaskExector)索引，是上一次选出的负载最小的线程

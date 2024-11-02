@@ -12,6 +12,14 @@
 
 namespace xkernel {
 
+enum class Thread_Priority {
+    Lowest = 0,
+    Low,
+    Normal,
+    High,
+    Highest
+};
+
 // 线程组类，管理一组线程
 class ThreadGroup {
 public:
@@ -40,26 +48,19 @@ private:
     std::unordered_map<std::thread::id, std::shared_ptr<std::thread>> threads_;  // 线程ID到线程对象的映射表
 };
 
+// 线程池，用于任务的执行
 class ThreadPool : public TaskExecutor {
 public:
-    enum class Priority {
-        Lowest = 0,
-        Low,
-        Normal,
-        High,
-        Highest
-    };
-
-    ThreadPool(int num = 1, Priority priority = Priority::Highest, 
+    ThreadPool(int num = 1, Thread_Priority priority = Thread_Priority::Highest, 
                bool auto_run = true, bool set_affinity = true, 
                const std::string& pool_name = "thread pool");
     ~ThreadPool();
     
 public:
     Task::Ptr async(TaskIn task, bool may_sync = true) override;
-    Task::Ptr async_first(TaskIn task, bool may_sync = true) override;
+    Task::Ptr asyncFirst(TaskIn task, bool may_sync = true) override;
     size_t size();
-    static bool setPriority(Priority priority = Priority::Highest, 
+    static bool setPriority(Thread_Priority priority = Thread_Priority::Highest, 
                             std::thread::native_handle_type threadId = 0);
     void start();
 
@@ -76,15 +77,16 @@ private:
     std::function<void(int)> on_setup_;
 };
 
+// 工作线程池，单例模式，用于事件的轮询
 class WorkThreadPool : public std::enable_shared_from_this<WorkThreadPool>,
-                       public TaskExecutorGetterImp {
+                       public TaskExecutorGetterImpl {
 public:
     using Ptr = std::shared_ptr<WorkThreadPool>;
-    WorkThreadPool() override = default;
+    ~WorkThreadPool() override = default;
     static WorkThreadPool& Instance();
 
 public:
-    static void setPoolSize(size_t size = 0);  // 设置
+    static void setPoolSize(size_t size = 0);
     static void enableCpuAffinity(bool enable);
     EventPoller::Ptr getFirstPoller();
     EventPoller::Ptr getPoller();

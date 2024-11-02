@@ -21,12 +21,10 @@ Timer::Timer(float second, const std::function<bool()> &cb,
     _tag = _poller->doDelayTask((uint64_t)(second * 1000), [cb, second]() {
         try {
             if (cb()) {
-                //重复的任务  [AUTO-TRANSLATED:2d440b54]
-                // Recurring task
+                //重复的任务  
                 return (uint64_t)(1000 * second);
             }
-            //该任务不再重复  [AUTO-TRANSLATED:4249fc53]
-            // This task no longer recurs
+            //该任务不再重复  
             return (uint64_t)0;
         } catch (std::exception &ex) {
             ErrorL << "Exception occurred when do timer task: " << ex.what();

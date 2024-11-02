@@ -63,6 +63,7 @@
 namespace toolkit {
 
 #define StrPrinter ::toolkit::_StrPrinter()
+// 继承自std::string，用于拼接字符串
 class _StrPrinter : public std::string {
    public:
     _StrPrinter() {}
@@ -73,7 +74,8 @@ class _StrPrinter : public std::string {
         this->std::string::operator=(_stream.str());
         return *this;
     }
-
+    // 允许使用std::endl等流操作符使用<<
+    // 参数是一个函数指针，返回值为std::ostream&, 指针名f，后面是参数列表, 为了和返回指针的函数区分
     std::string operator<<(std::ostream &(*f)(std::ostream &)) const {
         return *this;
     }

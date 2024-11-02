@@ -13,9 +13,10 @@
 #include <atomic>
 
 namespace xkernel {
+
 template <typename Msg>
 class MsgQueue {
- public:
+public:
   MsgQueue() {
     Msg_max_ = 100;
     Msg_len_.store(0);
@@ -75,6 +76,9 @@ class MsgQueue {
     Msg_len_.fetch_add(1);
     get_cond_.notify_one();
   }
+
+  // 唤醒所有等待的线程, 不再添加任务到队列
+  void pushExit(size_t n) { put_cond_.notify_all(); }
 
   void setNonblock() { nonblock_ = true; }
   void setBlock() {

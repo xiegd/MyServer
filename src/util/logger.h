@@ -117,7 +117,7 @@ public:
         return *this;
     }
 
-    void clear();
+    void clear();  // 清空_ctx管理的LogContext
 
 private:
     LogContextPtr _ctx;

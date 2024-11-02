@@ -27,17 +27,35 @@ set(OUTPUT_DIR ${CMAKE_SOURCE_DIR}/bin)
 set(SOURCE_DIR ${CMAKE_SOURCE_DIR}/../../src)
 set(HEADER_DIR ${CMAKE_SOURCE_DIR})
 set(INCLUDE_DIRS "")
-list(APPEND INCLUDE_DIRS ${SOURCE_DIR}/thread ${SOURCE_DIR}/network ${SOURCE_DIR}/util)
-include_directories(${INCLUDE_DIRS})
+list(APPEND INCLUDE_DIRS 
+  ${SOURCE_DIR}/thread 
+  ${SOURCE_DIR}/network 
+  ${SOURCE_DIR}/util
+  ${SOURCE_DIR}/poller
+)
 
-add_executable(logger_test logger_test.cc 
-              ${SOURCE_DIR}/util/timeticker.cc
-              ${SOURCE_DIR}/util/file.cc
-              ${SOURCE_DIR}/util/utility.cc
-              ${SOURCE_DIR}/util/uv_errno.cc
-              ${SOURCE_DIR}/util/logger.cc
+file(GLOB UTIL_SRCS ${SOURCE_DIR}/util/*.cc)
+file(GLOB POLLE_SRCS ${SOURCE_DIR}/poller/*.cc)
+file(GLOB THREAD_SRCS ${SOURCE_DIR}/thread/*.cc)
+file(GLOB NETWORK_SRCS ${SOURCE_DIR}/network/*.cc)
+
+file(GLOB UTIL_HEAD ${SOURCE_DIR}/util/*.h)
+file(GLOB POLLE_HEAD ${SOURCE_DIR}/poller/*.h)
+file(GLOB THREAD_HEAD ${SOURCE_DIR}/thread/*.h)
+file(GLOB NETWORK_HEAD ${SOURCE_DIR}/network/*.h)
+
+add_executable(eventpoller_test eventpoller_test.cc 
+              ${UTIL_SRCS}
+              ${POLLE_SRCS}
+              ${THREAD_SRCS}
+              ${NETWORK_SRCS}
               )
 
-target_link_libraries(logger_test gtest_main)
+target_include_directories(eventpoller_test 
+  PRIVATE
+    ${INCLUDE_DIRS}
+)
 
-set_target_properties(logger_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_DIR}) 
+target_link_libraries(eventpoller_test gtest_main)
+
+set_target_properties(eventpoller_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_DIR}) 

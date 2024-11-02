@@ -60,6 +60,9 @@ class ThreadPool : public TaskExecutor {
                 setThreadAffinity(index % std::thread::hardware_concurrency());
             }
         };
+        // 对于继承自enable_shared_from_this的类，需要使用shared_from_this()来获取shared_ptr
+        // 避免多个独立的shared_ptr指向同一个对象，导致无法析构, 
+        //在异步操作中确保对象的生命周期
         _logger = Logger::Instance().shared_from_this();
         if (auto_run) {
             start();
@@ -99,6 +102,7 @@ class ThreadPool : public TaskExecutor {
      * @return 任务的智能指针
      */
     Task::Ptr async_first(TaskIn task, bool may_sync = true) override {
+        // 如果可以同步执行，且在线程组中，则同步执行
         if (may_sync && _thread_group.is_this_thread_in()) {
             task();
             return nullptr;
@@ -137,10 +141,12 @@ class ThreadPool : public TaskExecutor {
         return true;
 #else
         // 非Windows平台实现(如Linux)
+        // 获取SCHED_FIFO调度策略的最小优先级
         static int Min = sched_get_priority_min(SCHED_FIFO);
         if (Min == -1) {
             return false;
         }
+        // 获取SCHED_FIFO调度策略的最大优先级
         static int Max = sched_get_priority_max(SCHED_FIFO);
         if (Max == -1) {
             return false;
@@ -150,11 +156,11 @@ class ThreadPool : public TaskExecutor {
                                    Min + (Max - Min) * 3 / 4, Max};
 
         if (threadId == 0) {
-            threadId = pthread_self();
+            threadId = pthread_self();  // 如果没有指定线程ID，则使用当前线程
         }
-        struct sched_param params;
-        params.sched_priority = Priorities[priority];
-        return pthread_setschedparam(threadId, SCHED_FIFO, &params) == 0;
+        struct sched_param params;  // 创建调度参数结构体
+        params.sched_priority = Priorities[priority];  // 填充结构体
+        return pthread_setschedparam(threadId, SCHED_FIFO, &params) == 0;  // 设置线程优先级
 #endif
     }
 

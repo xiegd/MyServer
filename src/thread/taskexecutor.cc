@@ -5,19 +5,20 @@
 #include "timeticker.h"
 #include "utility.h"
 #include "eventpoller.h"
+#include "threadpool.h"
 
 namespace xkernel {
 ///////////////////////////// ThreadLoadCounter /////////////////////////////////
 
 ThreadLoadCounter::ThreadLoadCounter(uint64_t max_size, uint64_t max_usec) 
     : max_size_(max_size), max_usec_(max_usec) {
-    last_sleep_time_ = last_wake_time_ = TimeUtil::getCurrentTimeMicrosecond();
+    last_sleep_time_ = last_wake_time_ = TimeUtil::getCurrentMicrosecond();
 }
 
 void ThreadLoadCounter::startSleep() {
     std::lock_guard<decltype(mtx_)> lock(mtx_);
     sleeping_ = true;
-    auto current_time = TimeUtil::getCurrentTimeMicrosecond();
+    auto current_time = TimeUtil::getCurrentMicrosecond();
     auto run_time = current_time - last_wake_time_;
     last_sleep_time_ = current_time;
     time_list_.emplace_back(run_time, false);
@@ -29,7 +30,7 @@ void ThreadLoadCounter::startSleep() {
 void ThreadLoadCounter::sleepWakeUp() {
     std::lock_guard<decltype(mtx_)> lock(mtx_);
     sleeping_ = false;
-    auto current_time = TimeUtil::getCurrentTimeMicrosecond();
+    auto current_time = TimeUtil::getCurrentMicrosecond();
     auto sleep_time = current_time - last_sleep_time_;
     last_wake_time_ = current_time;
     time_list_.emplace_back(sleep_time, true);
@@ -50,9 +51,9 @@ int ThreadLoadCounter::load() {
         }
     });
     if (sleeping_) {
-        total_sleep_time += (TimeUtil::getCurrentTimeMicrosecond() - last_sleep_time_);
+        total_sleep_time += (TimeUtil::getCurrentMicrosecond() - last_sleep_time_);
     } else {
-        total_run_time += (TimeUtil::getCurrentTimeMicrosecond() - last_wake_time_);
+        total_run_time += (TimeUtil::getCurrentMicrosecond() - last_wake_time_);
     }
     uint64_t total_time = total_sleep_time + total_run_time;
     while ((time_list_.size() != 0) && (total_time > max_usec_ || time_list_.size() > max_size_)) {
@@ -164,7 +165,7 @@ void TaskExecutorGetterImpl::forEach(const std::function<void(const TaskExecutor
 }
 
 size_t TaskExecutorGetterImpl::addPoller(const std::string& name, size_t size, 
-    int priority, bool register_thread, bool enable_cpu_affinity) {
+    Thread_Priority priority, bool register_thread, bool enable_cpu_affinity) {
         auto cpus = std::thread::hardware_concurrency();
         size = size > 0 ? size : cpus;
         for (size_t i = 0; i < size; ++i) {
@@ -173,10 +174,10 @@ size_t TaskExecutorGetterImpl::addPoller(const std::string& name, size_t size,
             EventPoller::Ptr poller(new EventPoller(full_name));
             poller->runLoop(false, register_thread);
             poller->async([cpu_index, full_name, priority, enable_cpu_affinity]() {
-                ThreadPool::setPriority((ThreadPool::Priority)priority);
-                setThreadName(full_name.data());
+                ThreadPool::setPriority(priority);
+                ThreadUtil::setThreadName(full_name.data());
                 if (enable_cpu_affinity) {
-                    setThreadAffinity(cpu_index);
+                    ThreadUtil::setThreadAffinity(cpu_index);
                 }
             });
             threads_.emplace_back(std::move(poller));

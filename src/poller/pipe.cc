@@ -2,10 +2,13 @@
 
 #include <fcntl.h>
 #include <stdexcept>
+#include <unistd.h>
 
 #include "sockutil.h"
-#include "utiltiy.h"
+#include "utility.h"
+#include "eventpoller.h"
 #include "uv_errno.h"
+#include "eventpoller.h"
 
 namespace xkernel {
 
@@ -27,7 +30,7 @@ int PipeWrap::read(void* buf, int n) {
     int ret;
     do {
         ret = ::read(pipe_fd_[0], buf, n);
-    } while (-1 == ret && UV_EINTR == get_uv_errmsg(true));
+    } while (-1 == ret && UV_EINTR == get_uv_error(true));
     return ret;
 }
 
@@ -58,7 +61,7 @@ void PipeWrap::clearFD() {
 
 //////////////////////////////// Pipe ////////////////////////////////////
 
-Pipe::Pipe(const onRead* cb, const EventPoller::Ptr& poller) {
+Pipe::Pipe(const onRead& cb, const EventPoller::Ptr& poller) {
     poller_ = poller;
     if (!poller_) {
         poller_ = EventPollerPool::Instance().getPoller();
@@ -66,7 +69,7 @@ Pipe::Pipe(const onRead* cb, const EventPoller::Ptr& poller) {
 
     pipe_ = std::make_shared<PipeWrap>();
     auto pipe = pipe_;
-    poller_->addEvent(pipe_->readFD(), EventPoller::Event_Read, [cb, pipe](int event) {
+    poller_->addEvent(pipe_->readFD(), EventPoller::Poll_Event::Read_Event, [cb, pipe](EventPoller::Poll_Event event) {
         int nread = 1024;
         ioctl(pipe->readFD(), FIONREAD, &nread);
         char buf[nread + 1];

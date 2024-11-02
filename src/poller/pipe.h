@@ -3,7 +3,7 @@
 
 #include <functional>
 
-#include "EventPoller.h"
+#include "eventpoller.h"
 
 namespace xkernel {
 
@@ -29,7 +29,7 @@ private:
 
 class Pipe {
 public:
-    using onRead = std::function<void(int size, const char* buf);
+    using onRead = std::function<void(int size, const char* buf)>;
 
     Pipe(const onRead& cb = nullptr, const EventPoller::Ptr& poller = nullptr);
     ~Pipe();

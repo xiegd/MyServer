@@ -1,0 +1,24 @@
+{
+    "configurations": [
+        {
+            "name": "Linux",
+            "compilerPathInCppPropertiesJson": "/usr/bin/gcc",
+            "includePath": [
+                "/mnt/c/Users/xgd/Desktop/MyServer/**"
+            ],
+            "defines": [],
+            "cStandard": "c17",
+            "cppStandard": "c++20",
+            "intelliSenseMode": "linux-gcc-x64",
+            "mergeConfigurations": false,
+            "compilerPath": null,
+            "browse": {
+                "path": [
+                    "/mnt/c/Users/xgd/Desktop/MyServer"
+                ],
+                "limitSymbolsToIncludedHeaders": true
+            }
+        }
+    ],
+    "version": 4
+}

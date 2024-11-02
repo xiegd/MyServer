@@ -37,7 +37,7 @@ public:
            bool print_log = false)
         : _ctx(std::move(ctx)) {
         if (!print_log) {
-            _ctx.clear();
+            _ctx.clear();  // 清空LogContextCapture管理的LogContext的shared_ptr
         }
         _created = _begin = getCurrentMillisecond();
         _min_ms = min_ms;
@@ -51,6 +51,8 @@ public:
     ~Ticker() {
         uint64_t tm = createdTime();
         if (tm > _min_ms) {
+            // 根据LogContextCapture中的设计，如果LogContextCapture的
+            // _ctx成员是个空指针，则会直接返回*this，而不会往_ctx中写日志
             _ctx << "take time: " << tm << "ms"
                  << ", thread may be overloaded";
         } else {
@@ -169,11 +171,20 @@ private:
     Ticker _ticker; ///< 内部使用的 Ticker 对象
 };
 
+// 简单情况使用#ifndef
 #if !defined(NDEBUG)
+// 只在debug模式下使用
+/*
+Ticker __ticker(5, WarnL, true)  // 允许窄化转换
+Ticker __ticker{5, WarnL, true}  // 禁止窄化转换
+等价于： Ticker __ticker = Ticker(5, WarnL, true)
+两种方式等价，第二种编译器会优化为第一种，第一种更直观；
+*/
 #define TimeTicker() Ticker __ticker(5, WarnL, true)
 #define TimeTicker1(tm) Ticker __ticker1(tm, WarnL, true)
 #define TimeTicker2(tm, log) Ticker __ticker2(tm, log, true)
 #else
+// 在release模式下为空, 这里还是要定义的原因是防止出现未定义错误
 #define TimeTicker()
 #define TimeTicker1(tm)
 #define TimeTicker2(tm, log)

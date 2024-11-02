@@ -159,14 +159,13 @@ bool TimeUtil::initMillisecondThread() {
     return true;
 }
 
-Ticker::Ticker(uint64_t min_ms = 0, LogContextCapture ctx = 
-    LogContextCapture(Logger::Instance(), LogLevel::LWarn, __FILE__, "", __LINE__), bool print_log = false) 
+Ticker::Ticker(uint64_t min_ms, LogContextCapture ctx, bool print_log) 
     : ctx_(std::move(ctx)) {
-        if (!print_log) {
-            ctx_.clear();
-        }
-        created_ = begin_ = TimeUtil::getCurrentMillisecond();
-        min_ms_ = min_ms;
+    if (!print_log) {
+        ctx_.clear();
+    }
+    created_ = begin_ = TimeUtil::getCurrentMillisecond();
+    min_ms_ = min_ms;
 }
 
 Ticker::~Ticker() {
@@ -182,7 +181,7 @@ uint64_t Ticker::elapsedTime() const { return TimeUtil::getCurrentMillisecond() 
 uint64_t Ticker::createdTime() const { return TimeUtil::getCurrentMillisecond() - created_; }
 void Ticker::resetTime() { begin_ = TimeUtil::getCurrentMillisecond(); }
 
-SmoothTicker::SmoothTicker(uint64_t reset_ms = 10000) {
+SmoothTicker::SmoothTicker(uint64_t reset_ms) {
     reset_ms_ = reset_ms;
     ticker_.resetTime();
 }
@@ -217,7 +216,7 @@ uint64_t SmoothTicker::elapsedTime() {
 }
 void SmoothTicker::resetTime() {
     first_time_ = 0;
-    pkt_count = 0;
+    pkt_count_ = 0;
     ticker_.resetTime();
 }
 } // namespace xkernel
