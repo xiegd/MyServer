@@ -184,6 +184,7 @@ EventPoller::EventPoller(std::string name) {
     SockUtil::setCloExec(event_fd_);
     name_ = std::move(name);
     logger_ = Logger::Instance().shared_from_this();
+    pipe_ = std::make_unique<PipeWrap>();
     addEventPipe();
 }
 
@@ -334,6 +335,8 @@ static size_t s_pool_size = 0;
 static bool s_enable_cpu_affinity = true;
 
 INSTANCE_IMP(EventPollerPool)
+
+const std::string EventPollerPool::KOnStarted = "kBroadcastEventPollerPoolStarted";
 
 EventPollerPool::EventPollerPool() {
     auto size = addPoller("event poller", s_pool_size, Thread_Priority::Highest, 

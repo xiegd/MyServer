@@ -326,10 +326,5 @@ private:
     ObjectCounter<BufferLikeString> counter_;
 };
 
-// 统计缓冲区对象个数
-StatisticImpl(Buffer) 
-StatisticImpl(BufferString)
-StatisticImpl(BufferRaw) 
-StatisticImpl(BufferLikeString)
 }  // namespace xkernel
 #endif

@@ -8,6 +8,7 @@
 #include <unordered_map>
 #include <mutex>
 #include <time.h>
+#include <unistd.h>
 
 #include "logger.h"
 #include "utility.h"
@@ -15,9 +16,33 @@
 
 namespace xkernel {
 
-class DnsCache;
+static int bind_sock(int fd, const char* ifr_ip, uint16_t port, int family);
+//////////////////////////////////// DnsCache //////////////////////////////////
+class DnsCache {
+public:
+    static DnsCache& Instance();
 
-// -------------------------------create socket----------------------------------
+    bool getDomainIP(const char* host, sockaddr_storage& storage,
+                     int ai_family = AF_INET, int ai_socktype = SOCK_STREAM,
+                     int ai_protocol = IPPROTO_TCP, int expire_sec = 60);
+private:
+    std::shared_ptr<struct addrinfo> getCacheDomainIP(const char* host, int expireSec);
+    void setCacheDomainIP(const char* host, std::shared_ptr<struct addrinfo> addr);
+    std::shared_ptr<struct addrinfo> getSystemDomainIP(const char* host);
+    struct addrinfo* getPerferredAddress(struct addrinfo* answer, int ai_family,
+                                        int ai_socktype, int ai_protocol);
+
+private:
+    class DnsItem {
+    public:
+        std::shared_ptr<struct addrinfo> addr_info_;
+        time_t create_time_;
+    };
+    std::mutex mtx_;
+    std::unordered_map<std::string, DnsItem> dns_cache_;
+};
+
+///////////////////////////////// create socket //////////////////////////////////
 
 int SockUtil::connect(const char* host, uint16_t port, bool async, 
                       const char* local_ip, uint16_t local_port) {
@@ -61,7 +86,7 @@ int SockUtil::connect(const char* host, uint16_t port, bool async,
 int SockUtil::listen(const uint16_t port, const char* local_ip, int back_log) {
     int fd = -1;
     int family = supportIpv6() ? (isIpv4(local_ip) ? AF_INET : AF_INET6) : AF_INET;
-    if ((fd = static_cast<int>socket(family, SOCK_STREAM, IPPROTO_TCP)) == -1) {
+    if (fd = static_cast<int>(socket(family, SOCK_STREAM, IPPROTO_TCP)) == -1) {
         WarnL << "Create socket failed: " << get_uv_errmsg(true);
         return -1;
     }
@@ -108,10 +133,10 @@ int SockUtil::bindUdpSock(const uint16_t port, const char* local_ip, bool enable
 }
 
 // 解除与udp sock相关的绑定关系    
-int SockUtil::dissolveUdpSock(int sock) {
+int SockUtil::dissolveUdpSock(int fd) {
     struct sockaddr_storage addr;
-    auto addr_len = sizeof(addr);
-    if (-1 == getsockname(fd, reinterpret_cast<struct sockaddr*>(&addr), static_cast<socklen_t>(addr_len))) {
+    socklen_t addr_len = sizeof(addr);
+    if (-1 == getsockname(fd, reinterpret_cast<struct sockaddr*>(&addr), &addr_len)) {
         WarnL << "getsockname failed: " << get_uv_errmsg();
         return -1;
     }
@@ -134,7 +159,7 @@ bool SockUtil::getDomainIP(const char* host, uint16_t port,
                 reinterpret_cast<sockaddr_in*>(&addr)->sin_port = htons(port);
                 break;
             case AF_INET6:
-                reinterpret_cast<sockaddr_in6*>(&addr)->sin6_port = htos(port);
+                reinterpret_cast<sockaddr_in6*>(&addr)->sin6_port = htons(port);
                 break;
             default:
                 break;
@@ -146,7 +171,7 @@ bool SockUtil::getDomainIP(const char* host, uint16_t port,
 // -------------------------------configure socket----------------------------------
 
 // 配置tcp的nodelay特性
-int SockUtil::setNoDelay(int fd, bool on = true) {
+int SockUtil::setNoDelay(int fd, bool on) {
     int opt = on ? 1 : 0;
     int ret = setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &opt, static_cast<socklen_t>(sizeof(opt)));
     if (ret == -1) {
@@ -170,7 +195,7 @@ int SockUtil::setNoSigpipe(int fd) {
 }
 
 // 设置读写socket是否阻塞
-int SockUtil::setNoBlocked(int fd, bool noblock = true) {
+int SockUtil::setNoBlocked(int fd, bool noblock) {
     int flags = fcntl(fd, F_GETFL);
     if (flags == -1) {
         TraceL << "fcntl F_GETFL failed";
@@ -227,7 +252,7 @@ int SockUtil::setReuseable(int fd, bool on, bool reuse_port) {
 }
 
 // 配置是否开启FD_CLOEXEC特性(多进程相关)
-int SockUtil::setCloExec(int fd, bool on = true) {
+int SockUtil::setCloExec(int fd, bool on) {
     int flags = fcntl(fd, F_GETFD);
     if (flags == -1) {
         TraceL << "fcntl F_GETFD failed";
@@ -277,7 +302,8 @@ int setKeepAlive(int fd, bool on, int interval, int idle, int times) {
 // 获取socket当前发生的错误的error code
 int SockUtil::getSockError(int fd) {
     int opt;
-    if (getsockopt(fd, SOL_SOCKET, SO_ERROR, &opt, static_cast<socklen_t>(sizeof(opt))) < 0) {
+    socklen_t opt_len = sizeof(opt);
+    if (getsockopt(fd, SOL_SOCKET, SO_ERROR, &opt, &opt_len) < 0) {
         return get_uv_error(true);
     }
     return uv_translate_posix_error(opt);
@@ -345,7 +371,7 @@ static inline void write4Byte(A&& a, B&& b) {
 int SockUtil::joinMultiAddrFilter(int sock, const char* addr, const char* src_ip, const char* local_ip) {
     struct ip_mreq_source imr;
     write4Byte(imr.imr_multiaddr, inet_addr(addr));
-    wrrite4Byte(imr.imr_sourceaddr, inet_addr(src_ip));
+    write4Byte(imr.imr_sourceaddr, inet_addr(src_ip));
     write4Byte(imr.imr_interface, inet_addr(local_ip));
 
     int ret = setsockopt(sock, IPPROTO_IP, IP_ADD_SOURCE_MEMBERSHIP, &imr, sizeof(struct ip_mreq_source));
@@ -369,7 +395,32 @@ int SockUtil::leaveMultiAddrFilter(int sock, const char* addr, const char* src_i
     return ret;
 }
 
-//----------------------------------ip地址, 端口， 网卡的一些操作----------------------------------
+///////////////////////////////// ip地址, 端口， 网卡的一些操作 /////////////////////////////////
+
+template <typename T>
+void for_each_netAdapter_posix(T&& fun) {
+    struct ifconf ifconf;
+    char buf[1024 * 10];
+    ifconf.ifc_len = sizeof(buf);
+    ifconf.ifc_buf = buf;
+    int sockfd = ::socket(AF_INET, SOCK_DGRAM, 0);
+    if (sockfd < 0) {
+        WarnL << "Create socket failed: " << get_uv_errmsg();
+        return ;
+    }
+    if ( -1 == ioctl(sockfd, SIOCGIFCONF, &ifconf)) {
+        WarnL << "ioctl SIOCGIFCONF failed: " << get_uv_errmsg();
+        close(sockfd);
+        return ;
+    }
+    close(sockfd);
+    struct ifreq* adapter = reinterpret_cast<struct ifreq*>(buf);
+    for (int i = (ifconf.ifc_len / sizeof(struct ifreq)); i > 0; --i, ++adapter) {
+        if (fun(adapter)) {
+            break;
+        }
+    }
+}
 
 // 获取网卡列表
 std::vector<std::map<std::string, std::string>> SockUtil::getInterfaceList() {
@@ -414,11 +465,11 @@ std::string SockUtil::inetNtoa(const struct in6_addr& addr) { return inet_ntop_l
 std::string SockUtil::inetNtoa(const struct sockaddr* addr) {
     switch (addr->sa_family) {
         case AF_INET:
-            return inetNtoa(reinterpret_cast<const struct in_addr&>(addr));
+            return inetNtoa(reinterpret_cast<const struct sockaddr_in*>(addr)->sin_addr);
         case AF_INET6: {
-            if (IN6_IS_ADDR_V4MAPPED(&reinterpret_cast<const struct sockaddr_in6&>(addr)->sin6_addr)) {
+            if (IN6_IS_ADDR_V4MAPPED(&reinterpret_cast<const struct sockaddr_in6*>(addr)->sin6_addr)) {
                 struct in_addr addr4;
-                memcpy(&addr4, 12 + (char*)&reinterpret_cast<const struct sockaddr_in6&>(addr)->sin6_addr, 4);
+                memcpy(&addr4, 12 + (char*)&reinterpret_cast<const struct sockaddr_in6*>(addr)->sin6_addr, 4);
                 return inetNtoa(addr4);
             }
             return inetNtoa(reinterpret_cast<const struct in6_addr&>(addr));
@@ -440,25 +491,25 @@ uint16_t SockUtil::inetPort(const struct sockaddr* addr) {
     }
 }
 
-static struct sockaddr_storage SockUtil::makeSockAddr(const char* ip, uint16_t port) {
+struct sockaddr_storage SockUtil::makeSockAddr(const char* host, uint16_t port) {
     struct sockaddr_storage storage;
     bzero(&storage, sizeof(storage));
 
     struct in_addr addr;
     struct in6_addr addr6;
-    if (1 == inet_pton(AF_INET, ip, &addr)) {
+    if (1 == inet_pton(AF_INET, host, &addr)) {
         reinterpret_cast<struct sockaddr_in&>(storage).sin_addr = addr;
         reinterpret_cast<struct sockaddr_in&>(storage).sin_family = AF_INET;
         reinterpret_cast<struct sockaddr_in&>(storage).sin_port = htons(port);
         return storage;
     }
-    if (1 == inet_pton(AF_INET6, ip, &addr6)) {
+    if (1 == inet_pton(AF_INET6, host, &addr6)) {
         reinterpret_cast<struct sockaddr_in6&>(storage).sin6_addr = addr6;
         reinterpret_cast<struct sockaddr_in6&>(storage).sin6_family = AF_INET6;
         reinterpret_cast<struct sockaddr_in6&>(storage).sin6_port = htons(port);
         return storage;
     }
-    throw std::invalid_argument(string("Not ip address: ") + host);
+    throw std::invalid_argument(std::string("Not ip address: ") + host);
 }
 
 // 根据网卡名获取ip
@@ -478,7 +529,7 @@ std::string SockUtil::getIfrIP(const char* if_name) {
 std::string SockUtil::getIfrName(const char* local_ip) {
     std::string ret = "en0";
     for_each_netAdapter_posix([&](struct ifreq* adapter) {
-        std::string ip = inet_ntoa(adapter->ifr_addr);
+        std::string ip = inetNtoa(&(adapter->ifr_addr));
         if (ip == local_ip) {
             ret = adapter->ifr_name;
             return true;
@@ -523,7 +574,7 @@ std::string getIfrBrdAddr(const char* if_name) {
         return "";
     }
     close(fd);
-    return inetNtoa(&(ifr_brdaddr.ifr_broadaddr));
+    return SockUtil::inetNtoa(&(ifr_brdaddr.ifr_broadaddr));
 }
 
 // 判断两个ip是否为同一网段
@@ -548,7 +599,7 @@ bool SockUtil::isIpv6(const char* host) {
 }
 
 socklen_t SockUtil::getSockLen(const struct sockaddr* addr) {
-    switch(addr->sa_famly) {
+    switch(addr->sa_family) {
         case AF_INET:
             return sizeof(sockaddr_in);
         case AF_INET6:
@@ -594,43 +645,8 @@ static uint16_t get_socket_port(int fd, getsockname_type func) {
     return SockUtil::inetPort(reinterpret_cast<struct sockaddr*>(&addr));
 }
 
-// 获取本机默认网卡ip
-std::string SockUtil::getLocalIp() {
-    std::string address = "127.0.0.1";
-    for_each_netAdapter_posix([&](struct ifreq* adapter) {
-        std::string ip = SockUtil::inetNtoa(&(adapter->ifr_addr));
-        // 跳过docker网卡
-        if (strstr(adapter->ifr_name, "docker")) {
-            return false;
-        }
-        return checkIP(address, ip);
-    });
-    return address;
-}
-
-// 获取socket绑定的本地ip
-std::string SockUtil::getLocalIp(int fd) { return get_socket_ip(fd, getsockname); }
-// 获取socket绑定的远端ip
-std::string SockUtil::getPeerIp(int fd) { return get_socket_ip(fd, getpeername); }
-// 获取socket绑定的本地端口
-uint16_t SockUtil::getLocalPort(int fd) { return get_socket_port(fd, getsockname); }
-// 获取socket绑定的远端端口
-uint16_t SockUtil::getPeerPort(int fd) { return get_socket_port(fd, getpeername); }
-
-//
-static int bind_sock(int fd, const char* ifr_ip, uint16_t port, int family) {
-    switch (family) {
-        case AF_INET:
-            return bind_sock4(fd, ifr_ip, port);
-        case AF_INET6:
-            return bind_sock6(fd, ifr_ip, port);
-        default:
-            return -1;
-    }
-}
-
 // 检查ip是否为私有地址
-bool checkIP(std::string& address, const std::string& ip) {
+bool check_iP(std::string& address, const std::string& ip) {
     if (ip != "127.0.0.1" && ip != "0.0.0.0") {
         address = ip;
         uint32_t addressInNetworkOrder = ntohl(inet_addr(ip.data()));
@@ -644,30 +660,85 @@ bool checkIP(std::string& address, const std::string& ip) {
     return false;
 }
 
-//----------------------------------DnsCache----------------------------------
-class DnsCache {
-public:
-    static DnsCache& Instance();
+// 获取本机默认网卡ip
+std::string SockUtil::getLocalIp() {
+    std::string address = "127.0.0.1";
+    for_each_netAdapter_posix([&](struct ifreq* adapter) {
+        std::string ip = SockUtil::inetNtoa(&(adapter->ifr_addr));
+        // 跳过docker网卡
+        if (strstr(adapter->ifr_name, "docker")) {
+            return false;
+        }
+        return check_iP(address, ip);
+    });
+    return address;
+}
 
-    bool getDomainIP(const char* host, sockaddr_storage& storage,
-                     int ai_family = AF_INET, int ai_socktype = SOCK_STREAM,
-                     int ai_protocol = IPPROTO_TCP, int expire_sec = 60);
-private:
-    std::shared_ptr<struct addrinfo> getCacheDomainIP(const char* host, int expireSec);
-    void setCacheDomainIP(const char* host, std::shared_ptr<struct addrinfo> addr);
-    std::shared_ptr<struct addrinfo> getSystemDomainIP(const char* host);
-    struct addrinfo* getPreferredAddress(struct addrinfo* answer, int ai_family,
-                                        int ai_socktype, int ai_protocol);
+// 获取socket绑定的本地ip
+std::string SockUtil::getLocalIp(int fd) { return get_socket_ip(fd, getsockname); }
+// 获取socket绑定的远端ip
+std::string SockUtil::getPeerIp(int fd) { return get_socket_ip(fd, getpeername); }
+// 获取socket绑定的本地端口
+uint16_t SockUtil::getLocalPort(int fd) { return get_socket_port(fd, getsockname); }
+// 获取socket绑定的远端端口
+uint16_t SockUtil::getPeerPort(int fd) { return get_socket_port(fd, getpeername); }
 
-private:
-    class DnsItem {
-    public:
-        std::shared_ptr<struct addrinfo> addr_info_;
-        time_t create_time_;
-    };
-    std::mutex mtx_;
-    std::unordered_map<std::string, DnsItem> dns_cache_;
-};
+static int bind_sock4(int fd, const char* ifr_ip, uint16_t port) {
+    struct sockaddr_in addr;
+    bzero(&addr, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(port);
+    if (1 != inet_pton(AF_INET, ifr_ip, &(addr.sin_addr))) {
+        if (strcmp(ifr_ip, "::")) {
+            WarnL << "inet_pton to ipv4 address failed: " << ifr_ip;
+        }
+        addr.sin_addr.s_addr = INADDR_ANY;
+    }
+    if (::bind(fd, reinterpret_cast<struct sockaddr*>(&addr), sizeof(addr)) == -1) {
+        WarnL << "Bind socket failed: " << get_uv_errmsg();
+        return -1;
+    }
+    return 0;
+}
+
+static int set_ipv6_only(int fd, bool flag) {
+    int opt = flag;
+    int ret = setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, &opt, sizeof(opt));
+    if (ret == -1) {
+        WarnL << "setsockopt IPV6_V6ONLY failed";
+    }
+    return ret;
+}
+
+static int bind_sock6(int fd, const char* ifr_ip, uint16_t port) {
+    set_ipv6_only(fd, false);
+    struct sockaddr_in6 addr;
+    bzero(&addr, sizeof(addr));
+    addr.sin6_family = AF_INET6;
+    addr.sin6_port = htons(port);
+    if (1 != inet_pton(AF_INET6, ifr_ip, &(addr.sin6_addr))) {
+        if (strcmp(ifr_ip, "0.0.0.0")) {
+            WarnL << "inet_pton to ipv6 address failed: " << ifr_ip;
+        }
+        addr.sin6_addr = IN6ADDR_ANY_INIT;
+    }
+    if (::bind(fd, reinterpret_cast<struct sockaddr*>(&addr), sizeof(addr)) == -1) {
+        WarnL << "Bind socket failed: " << get_uv_errmsg();
+        return -1;
+    }
+    return 0;
+}
+
+static int bind_sock(int fd, const char* ifr_ip, uint16_t port, int family) {
+    switch (family) {
+        case AF_INET:
+            return bind_sock4(fd, ifr_ip, port);
+        case AF_INET6:
+            return bind_sock6(fd, ifr_ip, port);
+        default:
+            return -1;
+    }
+}
 
 DnsCache& DnsCache::Instance() {
     static DnsCache instance;
@@ -690,7 +761,7 @@ bool DnsCache::getDomainIP(const char* host, sockaddr_storage& storage,
             }
         }
         if (item) {
-            auto addr = getPreferredAddress(item.get(), ai_family, ai_socktype, ai_protocol);
+            auto addr = getPerferredAddress(item.get(), ai_family, ai_socktype, ai_protocol);
             memcpy(&storage, addr->ai_addr, addr->ai_addrlen);
         }
         return static_cast<bool>(item);  // 解析失败返回false
@@ -745,4 +816,5 @@ struct addrinfo* DnsCache::getPerferredAddress(struct addrinfo* answer, int ai_f
     }
     return answer;
 }
+
 }  // namespace xkernel

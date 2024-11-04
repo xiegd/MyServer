@@ -197,8 +197,6 @@ private:
     std::unordered_map<std::string, EventDispatcher::Ptr> _eventListeners;
 };
 
-INSTANCE_IMP(NoticeCenter);  // 实现NoticeCenter的单例模式
-
 // 辅助结构体，用于简化事件触发
 template <typename T>
 struct NoticeHelper;

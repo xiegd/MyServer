@@ -8,12 +8,12 @@
 #include "logger.h"
 #include "uv_errno.h"
 #include "sockutil.h"
-#include "utiltiy.h"
+#include "utility.h"
 #include "buffer.h"
 
 namespace xkernel {
 
-StatisticImpl(BufferList)
+STATISTIC_IMPL(BufferList)
 
 ///////////////////////////////////// BufferSock //////////////////////////////////////
 
@@ -28,7 +28,7 @@ BufferSock::BufferSock(Buffer::Ptr buffer, struct sockaddr* addr, int addr_len) 
 
 char* BufferSock::data() const { return buffer_->data(); }
 size_t BufferSock::size() const { return buffer_->size(); }
-const struct sockaddr* BufferSock::sockaddr() const { return reinterpret_cast<struct sockaddr*>(&addr_); }
+const struct sockaddr* BufferSock::sockaddr() const { return reinterpret_cast<const struct sockaddr*>(&addr_); }
 socklen_t BufferSock::socklen() const { return addr_len_; }
 
 ///////////////////////////////////// SocketRecvBuffer //////////////////////////////////////
@@ -45,7 +45,7 @@ SocketRecvBuffer::Ptr SocketRecvBuffer::create(bool is_udp) {
 
 ///////////////////////////////////// BufferList //////////////////////////////////////
 
-BufferList::Ptr BufferList::create(List<std::pair<Buffer::Ptr, boll>> list, SendResult cb, bool is_udp) {
+BufferList::Ptr BufferList::create(List<std::pair<Buffer::Ptr, bool>> list, SendResult cb, bool is_udp) {
     if (is_udp) {
         return std::make_shared<BufferSendMMsg>(std::move(list), std::move(cb));
     }
@@ -54,7 +54,7 @@ BufferList::Ptr BufferList::create(List<std::pair<Buffer::Ptr, boll>> list, Send
 
 ///////////////////////////////////// BufferCallBack //////////////////////////////////////
 
-BufferCallBack::BufferCallBack(List<std::pair<Buffer:Ptr, bool>> list, BufferList::SendResult cb)
+BufferCallBack::BufferCallBack(List<std::pair<Buffer::Ptr, bool>> list, BufferList::SendResult cb)
     : cb_(std::move(cb)), pkt_list_(std::move(list)) {}
 
 BufferCallBack::~BufferCallBack() { sendCompleted(false); }
@@ -62,7 +62,7 @@ BufferCallBack::~BufferCallBack() { sendCompleted(false); }
 void BufferCallBack::sendCompleted(bool flag) {
     if (cb_) {
         while (!pkt_list_.empty()) {
-            cb_(pkt_list.front().first, flag);
+            cb_(pkt_list_.front().first, flag);
             pkt_list_.pop_front();
         }
     } else {
@@ -155,14 +155,14 @@ void BufferSendMsg::reOffset(size_t n) {
         size_t remain = offset - n;
         ref.iov_base = static_cast<char*>(ref.iov_base) + ref.iov_len - remain;
         ref.iov_len = remain;
-        break
+        break;
     }
 }
 
 ///////////////////////////////////// BufferSendTo //////////////////////////////////////
 
 BufferSendTo::BufferSendTo(List<std::pair<Buffer::Ptr, bool>> list, SendResult cb, bool is_udp)
-    : BufferCallBack(std::move(list, std::move(cb))), is_udp_(is_udp) {}
+    : BufferCallBack(std::move(list), std::move(cb)), is_udp_(is_udp) {}
 
 bool BufferSendTo::empty() { return pkt_list_.empty(); }
 size_t BufferSendTo::count() { return pkt_list_.size(); }
@@ -293,7 +293,7 @@ SocketRecvmmsgBuffer::SocketRecvmmsgBuffer(size_t count, size_t size)
         buffers_[i] = buf;
         auto& mmsg = mmsgs_[i];
         auto& addr = address_[i];
-        mms.msg_len = 0;
+        mmsg.msg_len = 0;
         mmsg.msg_hdr.msg_name = &addr;
         mmsg.msg_hdr.msg_namelen = sizeof(addr);
         mmsg.msg_hdr.msg_iov = &iovec_[i];

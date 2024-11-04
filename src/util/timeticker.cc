@@ -131,7 +131,6 @@ bool TimeUtil::initMillisecondThread() {
     static std::thread s_thread([]() {
         ThreadUtil::setThreadName("stamp thread");
         DebugL << "Stamp thread started";
-        // std::cout << "Stamp thread started" << std::endl;
         uint64_t last = getCurrentMicrosecondOrigin();
         uint64_t now;
         uint64_t microsecond = 0;

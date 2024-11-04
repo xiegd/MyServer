@@ -74,22 +74,22 @@ ThreadPool::~ThreadPool() {
 }
     
 Task::Ptr ThreadPool::async(TaskIn task, bool may_sync) {
-    if (may_sync && thread_group_.is_this_thread_in()) {
+    if (may_sync && thread_group_.isThisThreadIn()) {
         task();
         return nullptr;
     }
     auto ret = std::make_shared<Task>(std::move(task));
-    queue_.pushMsg(ret);
+    queue_.putMsg(ret);
     return ret;
 }
 
-Task::Ptr ThreadPool::async_first(TaskIn task, bool may_sync = true) {
-    if (may_sync && thread_group_.is_this_thread_in()) {
+Task::Ptr ThreadPool::asyncFirst(TaskIn task, bool may_sync) {
+    if (may_sync && thread_group_.isThisThreadIn()) {
         task();
         return nullptr;
     }
     auto ret = std::make_shared<Task>(std::move(task));
-    queue_.pushMsgToHead(ret);
+    queue_.putMsgToHead(ret);
     return ret;
 }
 
@@ -111,7 +111,7 @@ bool ThreadPool::setPriority(Thread_Priority priority, std::thread::native_handl
         threadId = pthread_self();
     }
     struct sched_param params;  // 创建调度参数结构体
-    params.sched_priority = Priorities[priority];
+    params.sched_priority = Priorities[static_cast<int>(priority)];
     return pthread_setschedparam(threadId, SCHED_FIFO, &params) == 0;
 }
 
@@ -121,7 +121,7 @@ void ThreadPool::start() {
     }
     size_t total = thread_num_ - thread_group_.size();
     for (size_t i = 0; i < total; ++i) {
-        thread_group_.createThread([this, i](){ run(i); })
+        thread_group_.createThread([this, i](){ run(i); });
     }
 }
 
@@ -164,6 +164,10 @@ EventPoller::Ptr WorkThreadPool::getPoller() {
 
 EventPoller::Ptr WorkThreadPool::getFirstPoller() {
     return std::static_pointer_cast<EventPoller>(threads_.front());
+}
+
+WorkThreadPool::WorkThreadPool() {
+    addPoller("work poller", s_pool_size, Thread_Priority::Lowest, false, s_enable_cpu_affinity);
 }
 
 }  // namespace xkernel

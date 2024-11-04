@@ -16,11 +16,12 @@
 #include <string>
 #include <vector>
 
+namespace xkernel {
 #define SOCKET_DEFAULT_BUF_SIZE (256 * 1024)
 #define TCP_KEEPALIVE_INTERVAL (60)
 #define TCP_KEEPALIVE_TIME (300)
 #define TCP_KEEPALIVE_PROBE_TIMES (5)
-
+ 
 // 套接字工具类，封装了socket、网络的一些基本操作
 class SockUtil {
 public:
@@ -33,7 +34,7 @@ public:
     static int bindUdpSock(const uint16_t port, const char* local_ip = "::", 
                         bool enable_reuse = true);
     // 解除与udp sock相关的绑定关系    
-    static int dissolveUdpSock(int sock);
+    static int dissolveUdpSock(int fd);
     // 配置tcp的nodelay特性
     static int setNoDelay(int fd, bool on = true);
     // 设置写socket不触发SIG_PIPE信号(貌似只有mac有效)
@@ -100,7 +101,7 @@ public:
     static std::string inetNtoa(const struct in6_addr& addr);
     static std::string inetNtoa(const struct sockaddr* addr);
     static uint16_t inetPort(const struct sockaddr* addr);
-    static struct sockaddr_storage makeSockAddr(const char* ip, uint16_t port);
+    static struct sockaddr_storage makeSockAddr(const char* host, uint16_t port);
     static socklen_t getSockLen(const struct sockaddr* addr);
     static bool getSockLocalAddr(int fd, struct sockaddr_storage& addr);
     static bool getSockPeerAddr(int fd, struct sockaddr_storage& addr);
@@ -122,5 +123,7 @@ public:
     static bool isIpv6(const char* host);
 
 };
+
+} // namespace xkernel
 
 #endif // _SOCKUTIL_H_

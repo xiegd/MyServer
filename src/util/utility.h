@@ -100,7 +100,7 @@ private:
 };
 
 // 对象计数器特化
-#define StatisticImpl(Type)                                    \
+#define STATISTIC_IMPL(Type)                                    \
     template <>                                                \
     std::atomic<size_t>& ObjectCounter<Type>::getCounter() {   \
         static std::atomic<size_t> instance(0);                \
