@@ -122,6 +122,8 @@ public:
     // 判断是否为ipv6地址
     static bool isIpv6(const char* host);
 
+    static bool isIP(const char* host);
+
 };
 
 } // namespace xkernel

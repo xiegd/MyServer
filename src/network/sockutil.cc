@@ -598,6 +598,10 @@ bool SockUtil::isIpv6(const char* host) {
     return 1 == inet_pton(AF_INET6, host, &addr);
 }
 
+bool SockUtil::isIP(const char* host) {
+    return isIpv4(host) || isIpv6(host);
+}
+
 socklen_t SockUtil::getSockLen(const struct sockaddr* addr) {
     switch(addr->sa_family) {
         case AF_INET:
