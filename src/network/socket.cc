@@ -64,7 +64,7 @@ void SockFd::delEvent() {
     }
 }
 
-void SockFd::setConnected() { num_->setConnected(); }
+void SockFd::setConnected() { num_->setConnected(); }  // 只针对IOS
 
 int SockFd::rawFd() const { return num_->rawFd(); }
 

@@ -703,8 +703,7 @@ template <typename FUN>
 void for_each_netAdapter_posix(FUN &&fun) {  // type: struct ifreq *
     struct ifconf ifconf;
     char buf[1024 * 10];
-    //初始化ifconf  [AUTO-TRANSLATED:d9c144ee]
-    // Initialize ifconf
+    //初始化ifconf  
     ifconf.ifc_len = sizeof(buf);
     ifconf.ifc_buf = buf;
     int sockfd = ::socket(AF_INET, SOCK_DGRAM, 0);
@@ -718,8 +717,7 @@ void for_each_netAdapter_posix(FUN &&fun) {  // type: struct ifreq *
         return;
     }
     close(sockfd);
-    //接下来一个一个的获取IP地址  [AUTO-TRANSLATED:6484a8b6]
-    // Get IP addresses one by one next
+    //接下来一个一个的获取IP地址
     struct ifreq *adapter = (struct ifreq *)buf;
     for (int i = (ifconf.ifc_len / sizeof(struct ifreq)); i > 0;
          --i, ++adapter) {

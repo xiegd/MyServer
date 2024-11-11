@@ -286,6 +286,23 @@ private:
     std::stringstream stream_;
 };
 
+// 计算数据传输速度的工具类
+class BytesSpeed {
+public:
+    BytesSpeed();
+    ~BytesSpeed();
+    BytesSpeed& operator+=(size_t bytes);
+    int getSpeed();
+
+private:
+    int computeSpeed();
+
+private:
+    int speed_;
+    size_t bytes_;
+    Ticker ticker_;
+};
+
 } // namespace xkernel
 
 #endif

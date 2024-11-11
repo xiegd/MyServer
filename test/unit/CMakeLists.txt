@@ -44,6 +44,8 @@ file(GLOB POLLE_HEAD ${SOURCE_DIR}/poller/*.h)
 file(GLOB THREAD_HEAD ${SOURCE_DIR}/thread/*.h)
 file(GLOB NETWORK_HEAD ${SOURCE_DIR}/network/*.h)
 
+message(STATUS "UTIL_SRCS: ${UTIL_SRCS}")
+
 add_executable(eventpoller_test eventpoller_test.cc 
               ${UTIL_SRCS}
               ${POLLE_SRCS}

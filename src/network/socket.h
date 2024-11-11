@@ -24,7 +24,7 @@ namespace xkernel {
 #define SEND_TIME_OUT_SEC 10
 
 enum class ErrorCode {
-    Success = 0,  // 成功
+    Success = 0,   // 成功
     Eof,           // EOF
     Timeout,       // 超时
     Refused,       // 连接被拒绝
@@ -49,7 +49,7 @@ public:
 
 private:
     ErrorCode code_;
-    int custom_code_ = 0;
+    int custom_code_ = 0;  // 自定义错误码
     std::string msg_;
 };
 

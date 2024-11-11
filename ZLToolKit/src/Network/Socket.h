@@ -66,6 +66,12 @@ typedef enum {
 // 错误信息类
 class SockException : public std::exception {
    public:
+    /*
+     * @param code 预定义的错误码
+     * @param msg 错误信息
+     * @param custom_code 自定义错误码
+     * 在保持统一的错误处理接口的同时，保留更多错误细节信息
+     */
     SockException(ErrCode code = Err_success, const std::string &msg = "",
                   int custom_code = 0) {
         _msg = msg;
@@ -90,6 +96,7 @@ class SockException : public std::exception {
     int getCustomCode() const { return _custom_code; }
 
     // 判断是否真的有错
+    // 类型转换运算符的重载，把对象转换为bool 类型, operator int(){}, 转换为int类型
     operator bool() const { return _code != Err_success; }
 
    private:
@@ -175,6 +182,7 @@ class SockFD : public noncopyable {
      * 复制一个 fd 对象
      * @param that 源对象
      * @param poller 事件监听器
+     * 复制构造
      */
     SockFD(const SockFD &that, const EventPoller::Ptr &poller) {
         _num = that._num;
@@ -186,10 +194,12 @@ class SockFD : public noncopyable {
 
     ~SockFD() { delEvent(); }
 
+    /* 从eventpoller中注销掉事件监听, 析构时调用，确保清理
+    */
     void delEvent() {
         if (_poller) {
             auto num = _num;
-            // 移除 IO 事件成功后再关闭 fd
+            // 移除 IO 事件成功后再关闭 fd, 从socket监听的fd中溢移除
             _poller->delEvent(num->rawFd(), [num](bool) {});
             _poller = nullptr;
         }
@@ -210,7 +220,8 @@ class SockFD : public noncopyable {
     EventPoller::Ptr _poller;
 };
 
-// 互斥锁包装类
+// 互斥锁包装类, 实现可选择是否启用互斥锁
+// 可以根据_enable的值，选择是否启用互斥锁
 template <class Mtx = std::recursive_mutex>
 class MutexWrapper {
    public:
@@ -519,7 +530,7 @@ class Socket : public std::enable_shared_from_this<Socket>,
     uint16_t get_local_port() override;
     std::string get_peer_ip() override;
     uint16_t get_peer_port() override;
-    std::string getIdentifier() const override;
+    std::string getIdentifier() const override;  // 实际返回的是socket对象的地址
 
    private:
     Socket(EventPoller::Ptr poller, bool enable_mutex = true);

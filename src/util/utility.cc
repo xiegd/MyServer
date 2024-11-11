@@ -126,4 +126,33 @@ bool ThreadUtil::setThreadAffinity(int i) {
     WarnL << "pthread_setaffinity_np failed: " << get_uv_errmsg();
     return false;
 }
+
+/////////////////////////// BytesSpeed ///////////////////////////////////
+
+BytesSpeed& BytesSpeed::operator+=(size_t bytes) {
+    bytes_ += bytes;
+    if (bytes_ > 1024 * 1024) {
+        computeSpeed();
+    }
+    return *this;
+}
+
+int BytesSpeed::getSpeed() {
+    if (ticker_.elapsedTime() < 1000) {
+        return speed_;
+    }
+    return computesSpeed();
+}
+
+int BytesSpeed::computeSpeed() {
+    auto elapsed = ticker_.elapsedTime();
+    if (!elapsed) {
+        return speed_;
+    }
+    speed_ = static_cast<int>(bytes_ * 1000 / elapsed);
+    ticker_.resetTime();
+    bytes_ = 0;
+    return speed_;
+}
+
 } // namespace xkernel
