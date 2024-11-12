@@ -287,16 +287,12 @@ class Socket : public std::enable_shared_from_this<Socket>,
    public:
     using Ptr = std::shared_ptr<Socket>;
     //接收数据回调  
-    using onReadCB = std::function<void(Buffer::Ptr &buf, struct sockaddr *addr,
-                                        int addr_len)>;
-    using onMultiReadCB = std::function<void(
-        Buffer::Ptr *buf, struct sockaddr_storage *addr, size_t count)>;
-
+    using onReadCB = std::function<void(Buffer::Ptr &buf, struct sockaddr *addr, int addr_len)>;
+    using onMultiReadCB = std::function<void(Buffer::Ptr *buf, struct sockaddr_storage *addr, size_t count)>;
     //发生错误回调  
     using onErrCB = std::function<void(const SockException &err)>;
     // tcp监听接收到连接请求  
-    using onAcceptCB =
-        std::function<void(Socket::Ptr &sock, std::shared_ptr<void> &complete)>;
+    using onAcceptCB = std::function<void(Socket::Ptr &sock, std::shared_ptr<void> &complete)>;
     // socket发送缓存清空事件，返回true代表下次继续监听该事件，否则停止
     using onFlush = std::function<bool()>;
     //在接收到连接请求前，拦截Socket默认生成方式  
@@ -536,11 +532,13 @@ class Socket : public std::enable_shared_from_this<Socket>,
     Socket(EventPoller::Ptr poller, bool enable_mutex = true);
 
     void setSock(SockNum::Ptr sock);
+    // TCP_Server类型的socket监听到Read_Event事件的回调
     int onAccept(const SockNum::Ptr &sock, int event) noexcept;
-    ssize_t onRead(const SockNum::Ptr &sock,
-                   const SocketRecvBuffer::Ptr &buffer) noexcept;
+    // tcp client/udp socket监听到Read_Event事件的回调
+    ssize_t onRead(const SockNum::Ptr &sock, const SocketRecvBuffer::Ptr &buffer) noexcept;
+    // tcp client/udp socket监听到Write_Event事件的回调
     void onWriteAble(const SockNum::Ptr &sock);
-    void onConnected(const SockNum::Ptr &sock, const onErrCB &cb);
+    void onConnected(const SockNum::Ptr &sock, const onErrCB &cb);  // TCP异步连接完成回调
     void onFlushed();
     void startWriteAbleEvent(const SockNum::Ptr &sock);
     void stopWriteAbleEvent(const SockNum::Ptr &sock);
@@ -586,18 +584,15 @@ class Socket : public std::enable_shared_from_this<Socket>,
     EventPoller::Ptr _poller;
     // 跨线程访问_sock_fd时需要上锁  
     mutable MutexWrapper<std::recursive_mutex> _mtx_sock_fd;
-
-    // socket异常事件(比如说断开)  
-    onErrCB _on_err;
-    // 收到数据事件
-    onMultiReadCB _on_multi_read;
-    // socket缓存清空事件(可用于发送流速控制)
-    onFlush _on_flush;
-    // tcp监听收到accept请求事件
-    onAcceptCB _on_accept;
+    // 用户自定义回调
+    onErrCB _on_err;  // socket异常事件(比如说断开)
+    onMultiReadCB _on_multi_read;  // 收到数据事件
+    onFlush _on_flush;  // socket缓存清空事件(可用于发送流速控制)
+    onAcceptCB _on_accept;  // tcp监听收到accept请求事件
     // tcp监听收到accept请求，自定义创建peer
     // Socket事件(可以控制子Socket绑定到其他poller线程)
     onCreateSocket _on_before_accept;
+
     // 设置上述回调函数的锁
     MutexWrapper<std::recursive_mutex> _mtx_event;
 
@@ -619,6 +614,7 @@ class Socket : public std::enable_shared_from_this<Socket>,
     struct sockaddr_storage _peer_addr;
 };
 
+// 抽象基类，用于统一不同类型数据的发送接口
 class SockSender {
    public:
     SockSender() = default;
@@ -648,6 +644,7 @@ class SockSender {
 };
 
 // Socket对象的包装类
+// 通过多重继承整合多个功能接口
 class SocketHelper : public SockSender,
                      public SockInfo,
                      public TaskExecutorInterface,

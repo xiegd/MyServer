@@ -41,7 +41,6 @@ void SockNum::setConnected() { /* 为IOS上的处理预留 */}
 
 //////////////////////////////// SockFd //////////////////////////////////////
 
-
 SockFd::SockFd(SockNum::Ptr num, const EventPoller::Ptr& poller) 
     : num_(std::move(num)), poller_(poller) {}
 
@@ -196,7 +195,7 @@ void Socket::connect_l(const std::string& url, uint16_t port,
     closeSock();  // 关闭当前socket
     std::weak_ptr<Socket> weak_self = shared_from_this();
 
-    // 连接回调
+    // 连接回调, 外层回调，负责进行清理和调用外部连接回调函数
     auto con_cb = [con_cb_in, weak_self](const SockException& err) {
         auto strong_self = weak_self.lock();
         if (!strong_self) {
@@ -207,10 +206,10 @@ void Socket::connect_l(const std::string& url, uint16_t port,
         if (err) {
             strong_self->setSock(nullptr);
         }
-        con_cb_in(err);
+        con_cb_in(err);  // 调用外部传入的连接回调函数
     };
 
-    // 异步连接回调
+    // 异步连接回调, 内层回调，设置Socket相关信息，注册事件监听
     auto async_con_cb = std::make_shared<std::function<void(const SockNum::Ptr&)>>(
         [weak_self, con_cb](const SockNum::Ptr& sock) {
             auto strong_self = weak_self.lock();
@@ -513,12 +512,15 @@ void Socket::setSock(SockNum::Ptr sock) {
     std::lock_guard<decltype(mtx_sock_fd_)> lock(mtx_sock_fd_);
     if (sock) {
         sock_fd_ = std::make_shared<SockFd>(sock, poller_);
+        SockUtil::getSockLocalAddr(sock->rawFd(), local_addr_);
+        SockUtil::getSockPeerAddr(sock->rawFd(), peer_addr_);
     } else {
         sock_fd_ = nullptr;
     }
 }
 
 void Socket::closeSock(bool close_fd) {
+    // 重置Socket到初始状态
     sendable_ = true;
     enable_recv_ = true;
     enable_speed_ = false;
@@ -724,7 +726,7 @@ void Socket::onWriteAble(const SockNum::Ptr& sock) {
     if (empty_waiting && empty_sending) {
         stopWriteAbleEvent(sock);  // 数据已经清空了，我们停止监听可写事件
     } else {
-        flushData(sock, true);  // 我们尝试发送剩余的数据
+        flushData(sock, true);  // 尝试发送剩余的数据
     }
 }
 
@@ -839,7 +841,6 @@ void Socket::enableRecv(bool enabled) {
         return ;
     }
     enable_recv_ = enabled;
-    enableRecv(enabled);
     int read_flag = enabled ? EventPoller::Poll_Event::Read_Event : 0;
     int send_flag = sendable_ ? 0 : EventPoller::Poll_Event::Write_Event;  // 可写时，不监听可写事件
     poller_->modifyEvent(rawFd(), read_flag | send_flag | EventPoller::Poll_Event::Error_Event);
@@ -853,6 +854,7 @@ int Socket::rawFd() const {
     return sock_fd_->rawFd();
 }
 
+// alive状态，socket fd有效且没有触发错误回调
 bool Socket::alive() const {
     std::lock_guard<decltype(mtx_sock_fd_)> lock(mtx_sock_fd_);
     return sock_fd_ && !err_emit_;
@@ -870,9 +872,7 @@ void Socket::setSendTimeOutSecond(uint32_t second) {
     max_send_buffer_ms_ = second * 1000;
 }
 
-bool Socket::isSocketBusy() const {
-    return !sendable_.load();
-}
+bool Socket::isSocketBusy() const { return !sendable_.load(); }
 
 const EventPoller::Ptr& Socket::getPoller() const { return poller_; }
 

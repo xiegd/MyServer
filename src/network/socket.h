@@ -168,10 +168,10 @@ public:
 public:
     void connect(const std::string& url, uint16_t port, const onErrCb& cb,
                 float timeout_sec = 5,
-                const std::string& local_ip = "::", uint16_t local_port = 0);
-    bool listen(uint16_t port, const std::string& local_ip = "::", int backlog = 1024);
-    bool bindUdpSock(uint16_t port, const std::string& local_ip = "::", bool enable_reuse = true);
-    bool fromSock(int fd, SockNum::SockType type);
+                const std::string& local_ip = "::", uint16_t local_port = 0);  // 创建和初始化tcp客户端socket
+    bool listen(uint16_t port, const std::string& local_ip = "::", int backlog = 1024);  // 创建和初始化tcp服务器 监听socket
+    bool bindUdpSock(uint16_t port, const std::string& local_ip = "::", bool enable_reuse = true);  // 创建和初始化udp socket
+    bool fromSock(int fd, SockNum::SockType type);  // 从已有fd创建socket
     bool cloneSocket(const Socket& other);  // 从另一个Socket复制， 让一个Socket被多个poller监听
     // 设置事件回调
     void setOnRead(onReadCb cb);
@@ -181,7 +181,7 @@ public:
     void setOnFlush(onFlush cb);
     void setOnBeforeAccept(onCreateSocket cb);
     void setOnSendResult(onSendResult cb);
-    // 发送数据相关接口
+    // 发送数据相关接口, 将buffer添加到发送缓冲，尝试发送
     ssize_t send(const void* buf, size_t size = 0,
                 struct sockaddr* addr = nullptr, socklen_t addr_len = 0,
                 bool try_flush = true);
@@ -190,15 +190,15 @@ public:
     ssize_t send(Buffer::Ptr buf, struct sockaddr* addr = nullptr, 
                 socklen_t addr_len = 0, bool try_flush = true);
     int flushAll();
-    bool emitErr(const SockException& err) noexcept;
-    void enableRecv(bool enabled);
+    bool emitErr(const SockException& err) noexcept;  // 安全添加错误事件，避免重复触发错误回调
+    void enableRecv(bool enabled);  // 设置是否启用接收监听socket可读事件
     int rawFd() const;
-    int alive() const;
+    int alive() const;  // 检查socket是否处于alive状态
     SockNum::SockType sockType() const;
-    void setSendTimeOutSencond(uint32_t second);
-    bool isSocketBusy() const;
+    void setSendTimeOutSecond(uint32_t second);  
+    bool isSocketBusy() const;  // 检查socket是否繁忙, 即是否可以直接发送数据(不通过缓冲区)
     const EventPoller::Ptr& getPoller() const;
-    bool bindPeerAddr(const struct sockaddr* dst_addr, socklen_t addr_len = 0, bool soft_bind = false);
+    bool bindPeerAddr(const struct sockaddr* dst_addr, socklen_t addr_len = 0, bool soft_bind = false);  // udp socket绑定对端地址
     void setSendFlags(int flags = SOCKET_DEFAULT_FLAGS);
     void closeSock(bool close_fd = true);
     size_t getSendBufferCount();
@@ -214,27 +214,27 @@ public:
 
 private:
     Socket(EventPoller::Ptr poller, bool enable_mutex = true);
-    void setSock(SockNum::Ptr sock);
-    int onAccept(const SockNum::Ptr& sock, int event) noexcept;
-    ssize_t onRead(const SockNum::Ptr& sock, const SocketRecvBuffer::Ptr& buffer) noexcept;
-    void onWriteAble(const SockNum::Ptr& sock);
-    void onConnected(const SockNum::Ptr& sock, const onErrCb& cb);
-    void onFlushed();
+    void setSock(SockNum::Ptr sock);  // 设置sock_fd_和local_addr_、peer_addr_
+    int onAccept(const SockNum::Ptr& sock, int event) noexcept;  // TCP_Server类型的socket监听到Read_Event事件的回调
+    ssize_t onRead(const SockNum::Ptr& sock, const SocketRecvBuffer::Ptr& buffer) noexcept;  // TCP/UDP socket监听到Read_Event事件的回调
+    void onWriteAble(const SockNum::Ptr& sock);  // socket可写事件触发时的回调
+    void onConnected(const SockNum::Ptr& sock, const onErrCb& cb);  // TCP异步连接完成回调
+    void onFlushed();  // 发送缓冲发送完成回调
     void startWriteAbleEvent(const SockNum::Ptr& sock);
     void stopWriteAbleEvent(const SockNum::Ptr& sock);
     bool flushData(const SockNum::Ptr& sock, bool poller_thread);
-    bool attachEvent(const SockNum::Ptr& sock);
+    bool attachEvent(const SockNum::Ptr& sock);  // 根据socket类型，添加对应的事件回调(注册事件监听)
     ssize_t send_l(Buffer::Ptr buf, bool is_buf_sock, bool try_flush = true);
     void connect_l(const std::string& url, uint16_t port,
                    const onErrCb& con_cb_in, float timeout_sec,
                    const std::string& local_ip, uint16_t local_port);
-    bool fromSock_l(SockNum::Ptr sock);
+    bool fromSock_l(SockNum::Ptr sock);  // 从已有的fd创建socket
 
 private:
     int sock_flags_ = SOCKET_DEFAULT_FLAGS;                   // socket发送时的flag
     uint32_t max_send_buffer_ms_ = SEND_TIME_OUT_SEC * 1000;  // 最大发送缓存，单位毫秒，距上次发送缓存清空时间不能超过该参数
     std::atomic<bool> enable_recv_{true};                      // 标记是否启用接收监听socket可读事件
-    std::atomic<bool> sendable_{true};                        // 标记socket是否可写
+    std::atomic<bool> sendable_{true};                        // 标记socket是否可以直接发送数据(不通过缓冲区)
     bool err_emit_ = false;                                    // 标记是否已经触发err回调
     bool enable_speed_ = false;                               // 标记是否启用网速统计
     std::shared_ptr<struct sockaddr_storage> udp_send_dst_;   // udp发送目标地址
@@ -246,13 +246,13 @@ private:
     SockFd::Ptr sock_fd_;                                     // socket fd的抽象类
     EventPoller::Ptr poller_;                                 // 本socket绑定的poller线程，事件触发于此线程
     mutable MutexWrapper<std::recursive_mutex> mtx_sock_fd_;
-
-    onErrCb on_err_;                                        // socket异常事件
+    // 用户自定义回调
+    onErrCb on_err_;                                        // socket异常事件回调
     onMultiReadCb on_multi_read_;                           // 收到数据事件
     onFlush on_flush_;                                      // socket缓存清空事件
     onAcceptCb on_accept_;                                  // tcp监听收到accept请求事件
     onCreateSocket on_before_accept_;                       // tcp监听收到accept请求，自定义创建peer
-    MutexWrapper<std::recursive_mutex> mtx_event_;          // 设置上述回调的锁
+    MutexWrapper<std::recursive_mutex> mtx_event_;          // 设置自定义回调的锁
 
     List<std::pair<Buffer::Ptr, bool>> send_buf_waiting_;   // 一级发送缓存, socket可写时会把一级缓存批量送入二级缓存
     MutexWrapper<std::recursive_mutex> mtx_send_buf_waiting_;  // 一级发送缓存锁
@@ -270,6 +270,8 @@ public:
     SockSender() = default;
     virtual ~SockSender() = default;
     virtual ssize_t send(Buffer::Ptr buf) = 0;
+    ssize_t send(std::string buf);
+    ssize_t send(const char* buf, size_t size = 0);
     virtual void shutdown(const SockException& ex = SockException(ErrorCode::Shutdown, "self shutdown")) = 0;
     SockSender& operator<<(Buffer::Ptr buf);
     SockSender& operator<<(std::string buf);
@@ -282,10 +284,9 @@ public:
         send(ss.str());
         return *this;
     }
-    ssize_t send(std::string buf);
-    ssize_t send(const char* buf, size_t size = 0);
 };
 
+// Socket对象的包装类
 class SocketHelper : public SockSender,
                      public SockInfo,
                      public TaskExecutorInterface,

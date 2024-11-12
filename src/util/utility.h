@@ -286,7 +286,7 @@ private:
     std::stringstream stream_;
 };
 
-// 计算数据传输速度的工具类
+// 计算数据传输实时速度的工具类
 class BytesSpeed {
 public:
     BytesSpeed();

@@ -48,7 +48,7 @@ class BytesSpeed {
         }
         _speed = (int)(_bytes * 1000 / elapsed);
         _ticker.resetTime();
-        _bytes = 0;
+        _bytes = 0;  // 重置字节数
         return _speed;
     }
 

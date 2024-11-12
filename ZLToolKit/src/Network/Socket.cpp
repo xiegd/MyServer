@@ -189,7 +189,7 @@ void Socket::connect_l(const string &url, uint16_t port,
     // 重置当前socket  
     closeSock();
     weak_ptr<Socket> weak_self = shared_from_this();
-    // 连接回调函数的封装
+    // 连接回调函数的封装, 外层回调，负责进行清理和调用外部连接回调函数
     auto con_cb = [con_cb_in, weak_self](const SockException &err) {
         auto strong_self = weak_self.lock();
         if (!strong_self) {
@@ -204,7 +204,7 @@ void Socket::connect_l(const string &url, uint16_t port,
         con_cb_in(err);  // 调用外部传入的连接回调函数
     };
 
-    // 异步连接回调函数的封装
+    // 异步连接回调函数的封装, 内层回调，设置Socket相关信息，注册事件监听
     auto async_con_cb = std::make_shared<function<void(const SockNum::Ptr &)>>(
         [weak_self, con_cb](const SockNum::Ptr &sock) {
             auto strong_self = weak_self.lock();
@@ -213,7 +213,8 @@ void Socket::connect_l(const string &url, uint16_t port,
                 return;
             }
 
-            // 监听该socket是否可写，可写表明已经连接服务器成功
+            // 监听该socket是否可写，可写表明已经连接服务器成功, 调用TCP异步连接完成回调
+            // Event_Error是为了处理连接过程中可能出现的错误，包括网络不可达，连接超时等
             int result = strong_self->_poller->addEvent(
                 sock->rawFd(),
                 EventPoller::Event_Write | EventPoller::Event_Error,
@@ -222,7 +223,7 @@ void Socket::connect_l(const string &url, uint16_t port,
                         strong_self->onConnected(sock, con_cb);
                     }
                 });
-
+            // 如果添加事件监听失败，则调用连接错误回调
             if (result == -1) {
                 con_cb(SockException(
                     Err_other,
@@ -273,10 +274,11 @@ void Socket::connect_l(const string &url, uint16_t port,
     }
 }
 
+// TCP异步连接完成后的回调，设置socket相关信息, 注册相应的事件监听
 void Socket::onConnected(const SockNum::Ptr &sock, const onErrCB &cb) {
-    auto err = getSockErr(sock->rawFd(), false);
-    if (err) {
-        // 连接失败  
+    auto err = getSockErr(sock->rawFd(), false);  // 获取socket错误信息
+    if (err) { 
+        // 如果有错误，调用错误回调
         cb(err);
         return;
     }
@@ -285,6 +287,7 @@ void Socket::onConnected(const SockNum::Ptr &sock, const onErrCB &cb) {
     setSock(sock);
     // 先删除之前的可写事件监听  
     _poller->delEvent(sock->rawFd(), [sock](bool) {});
+    // 为socket添加事件监听
     if (!attachEvent(sock)) {
         // 连接失败  
         cb(SockException(Err_other,
@@ -293,6 +296,7 @@ void Socket::onConnected(const SockNum::Ptr &sock, const onErrCB &cb) {
     }
 
     {
+        // ios, 设置连接状态
         LOCK_GUARD(_mtx_sock_fd);
         if (_sock_fd) {
             _sock_fd->setConnected();
@@ -302,7 +306,7 @@ void Socket::onConnected(const SockNum::Ptr &sock, const onErrCB &cb) {
     cb(err);
 }
 
-// 根据socket类型，添加对应的事件监听(为socket注册事件监听)
+// 根据socket类型，添加对应的事件监听(为socket注册事件监听), 设置对应的回调
 bool Socket::attachEvent(const SockNum::Ptr &sock) {
     weak_ptr<Socket> weak_self = shared_from_this();
     if (sock->type() == SockNum::Sock_TCP_Server) {
@@ -395,6 +399,7 @@ ssize_t Socket::onRead(const SockNum::Ptr &sock,
     return 0;  // 没有开启_enable_recv，则不接收数据
 }
 
+// 添加错误事件，避免重复触发错误回调
 bool Socket::emitErr(const SockException &err) noexcept {
     if (_err_emit) {
         return true;
@@ -408,7 +413,7 @@ bool Socket::emitErr(const SockException &err) noexcept {
         }
         LOCK_GUARD(strong_self->_mtx_event);
         try {
-            strong_self->_on_err(err);
+            strong_self->_on_err(err);  // 
         } catch (std::exception &ex) {
             ErrorL << "Exception occurred when emit on_err: " << ex.what();
         }
@@ -441,12 +446,16 @@ ssize_t Socket::send(Buffer::Ptr buf, struct sockaddr *addr, socklen_t addr_len,
                      bool try_flush) {
     if (!addr) {
         if (!_udp_send_dst) {
+            // 没有指定目标地址，也没有默认的udp目标地址，
+            // 则使用TCP/已连接的udp发送数据(tcp在连接时已指定默认的目标地址)
             return send_l(std::move(buf), false, try_flush);
         }
         // 本次发送未指定目标地址，但是目标定制已通过bindPeerAddr指定
+        // 使用默认的udp目标地址
         addr = (struct sockaddr *)_udp_send_dst.get();
         addr_len = SockUtil::get_sock_len(addr);
     }
+    // 使用指定的目标地址发送数据
     return send_l(std::make_shared<BufferSock>(std::move(buf), addr, addr_len),
                   true, try_flush);
 }
@@ -471,6 +480,7 @@ ssize_t Socket::send_l(Buffer::Ptr buf, bool is_buf_sock, bool try_flush) {
     return size;
 }
 
+// 尝试刷新发送缓冲队列中的所有数据
 int Socket::flushAll() {
     LOCK_GUARD(_mtx_sock_fd);
 
@@ -479,7 +489,7 @@ int Socket::flushAll() {
         return -1;
     }
     if (_sendable) {
-        // 该socket可写  
+        // 该socket可写, 进行实际的发送
         return flushData(_sock_fd->sockNum(), false) ? 0 : -1;
     }
 
@@ -492,19 +502,21 @@ int Socket::flushAll() {
     return 0;
 }
 
+// 发送缓冲发送完成回调
 void Socket::onFlushed() {
     bool flag;
     {
         LOCK_GUARD(_mtx_event);
-        flag = _on_flush();
+        flag = _on_flush();  // 调用用户自定义的回调
     }
     if (!flag) {
-        setOnFlush(nullptr);
+        setOnFlush(nullptr);  // 根据用户自定义回调返回值控制是否继续监听刷新事件
     }
 }
 
 // 关闭清理socket
 void Socket::closeSock(bool close_fd) {
+    // 重置Socket到初始状态
     _sendable = true;
     _enable_recv = true;
     _enable_speed = false;
@@ -533,6 +545,7 @@ void Socket::closeSock(bool close_fd) {
     }
 }
 
+// 获取发送缓冲队列中的缓冲区个数
 size_t Socket::getSendBufferCount() {
     size_t ret = 0;
     {
@@ -548,6 +561,7 @@ size_t Socket::getSendBufferCount() {
     return ret;
 }
 
+// 获取距离上次发送缓冲清空的时间
 uint64_t Socket::elapsedTimeAfterFlushed() {
     return _send_flush_ticker.elapsedTime();
 }
@@ -869,7 +883,9 @@ bool Socket::flushData(const SockNum::Ptr &sock, bool poller_thread) {
     return poller_thread ? flushData(sock, poller_thread) : true;
 }
 
+// socket可写事件触发时的回调
 void Socket::onWriteAble(const SockNum::Ptr &sock) {
+    // 检查一级/二级发送缓冲是否为空
     bool empty_waiting;
     bool empty_sending;
     {
@@ -915,7 +931,7 @@ void Socket::enableRecv(bool enabled) {
     }
     _enable_recv = enabled;
     int read_flag = _enable_recv ? EventPoller::Event_Read : 0;
-    // 可写时，不监听可写事件  
+    // 可写时，不监听可写事件, 直接使用系统调用发送, 而不通过缓冲区
     int send_flag = _sendable ? 0 : EventPoller::Event_Write;
     _poller->modifyEvent(rawFD(),
                          read_flag | send_flag | EventPoller::Event_Error);
@@ -929,6 +945,8 @@ int Socket::rawFD() const {
     return _sock_fd->rawFd();
 };
 
+// 检查socket是否处于alive状态
+// 即socket fd有效且没有触发错误回调
 bool Socket::alive() const {
     LOCK_GUARD(_mtx_sock_fd);
     return _sock_fd && !_err_emit;
@@ -942,10 +960,12 @@ SockNum::SockType Socket::sockType() const {
     return _sock_fd->type();
 }
 
+// 设置发送缓冲的最大超时时间
 void Socket::setSendTimeOutSecond(uint32_t second) {
     _max_send_buffer_ms = second * 1000;
 }
 
+// 检查socket是否繁忙, 即是否可以直接发送数据(不通过缓冲区)
 bool Socket::isSocketBusy() const { return !_sendable.load(); }
 
 const EventPoller::Ptr &Socket::getPoller() const { return _poller; }
@@ -964,6 +984,7 @@ bool Socket::cloneSocket(const Socket &other) {
     return fromSock_l(sock);
 }
 
+// udp socket绑定对端地址
 bool Socket::bindPeerAddr(const struct sockaddr *dst_addr, socklen_t addr_len,
                           bool soft_bind) {
     LOCK_GUARD(_mtx_sock_fd);
