@@ -55,6 +55,8 @@ private:
     std::weak_ptr<Server> server_;
 };
 
+// server 基类, 暂时仅用于剥离 SessionHelper 对 TcpServer 的依赖
+// 这里还要继续改进
 class Server : public std::enable_shared_from_this<Server>, public mIni {
 public:
     using Ptr = std::shared_ptr<Server>;

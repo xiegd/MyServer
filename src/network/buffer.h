@@ -18,6 +18,7 @@
 #include <cstring>
 
 #include "utility.h"
+#include "ResourcePool.h"
 
 namespace xkernel {
 // 用于检查类型是否为指针的模板结构体
@@ -148,7 +149,7 @@ public:
     }
 
 protected:
-    // friend class ResourcePool_l<BufferRaw>;
+    friend class ResourcePool_l<BufferRaw>;
 
     BufferRaw(size_t capacity = 0) {
         if (capacity) {

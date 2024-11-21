@@ -31,11 +31,12 @@ SSLInitor& SSLInitor::Instance() {
 
 SSLInitor::SSLInitor() {
 #if defined(ENABLE_OPENSSL)
-    SSL_library_init();
-    SSL_load_error_strings();
-    OpenSSL_add_all_digests();
-    OpenSSL_add_all_ciphers();
-    OpenSSL_add_all_algorithms();
+    SSL_library_init();  // 初始化SSL库
+    SSL_load_error_strings();  // 加载错误字符串
+    OpenSSL_add_all_digests();  // 添加所有摘要算法
+    OpenSSL_add_all_ciphers();  // 添加所有加密算法
+    OpenSSL_add_all_algorithms();  // 添加所有算法
+    // 设置锁定回调函数, 在多线程下保护SSL相关的共享资源
     CRYPTO_set_locking_callback([](int mode, int n, const char* file, int line) {
         static std::mutex* s_mutexes = new std::mutex[CRYPTO_num_locks()];
         static onceToken token(nullptr, []() { delete[] s_mutexes; })
@@ -45,8 +46,8 @@ SSLInitor::SSLInitor() {
             s_mutexs[n].unlock();
         }
     });
-
-    CRYPTO_set_id_callback([]() -> unsigned long { return static_cast<unsigned long>(pthread_self()); });
+    // 设置获取线程ID回调函数
+    CRYPTO_set_id_callback([]() -> unsigned long { return static_cast<unsigned long>(pthread_self()); }); 
     setContext("", SSLUtil::makeSSLContext(vector<shared_ptr<X509>>(), nullptr, false), false);
     setContext("", SSLUtil::makeSSLContext(vector<shared_ptr<X509>>(), nullptr, true), true);
 #endif  // defined(ENABLE_OPENSSL)
