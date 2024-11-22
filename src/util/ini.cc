@@ -1,5 +1,7 @@
 #include "ini.h"
 
+#include "utility.h"
+
 namespace xkernel {
 
 using mIni = IniBasic<std::string, variant>;
@@ -15,10 +17,10 @@ bool variant::as<bool>() const {
     if (empty() || isdigit(front())) {
         return as_default<bool>();
     }
-    if (strToLower(std::string(*this)) == "true") {
+    if (StringUtil::strToLower(std::string(*this)) == "true") {
         return true;
     }
-    if (strToLower(std::string(*this)) == "false") {
+    if (StringUtil::strToLower(std::string(*this)) == "false") {
         return false;
     }
     return as_default<bool>();

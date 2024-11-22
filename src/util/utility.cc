@@ -66,6 +66,32 @@ bool StringUtil::endWith(const std::string& str, const std::string& substr) {
     return pos != std::string::npos && pos == str.size() - substr.size();
 }
 
+std::string& StringUtil::trim(std::string& str, const std::string& chars) {
+    do {
+        std::string map(0xFF, '\0');
+        for (auto& ch : chars) {
+            map[(uint8_t)ch] = '\1';
+        }
+        while (str.size() && map.at((uint8_t)str.back())) str.pop_back();
+        while (str.size() && map.at((uint8_t)str.front())) str.erase(0, 1);
+    } while (0);
+
+    return str;
+}
+
+std::string StringUtil::trim(std::string&& str, const std::string& chars) {
+    do {
+        std::string map(0xFF, '\0');
+        for (auto& ch : chars) {
+            map[(uint8_t)ch] = '\1';
+        }
+        while (str.size() && map.at((uint8_t)str.back())) str.pop_back();
+        while (str.size() && map.at((uint8_t)str.front())) str.erase(0, 1);
+    } while (0);
+
+    return std::move(str);
+}
+
 semaphore::semaphore(size_t initial) : count_(initial) {}
 
 semaphore::~semaphore() {}

@@ -19,20 +19,20 @@ public:
         std::string symbol, tag;
         
         for (auto& line : lines) {
-            line = trim(line);  // 去除行首尾空白
+            line = StringUtil::trim(line);  // 去除行首尾空白
             // 忽略空行和注释行（以 ; 或 # 开头）
             if (line.empty() || line.front() == ';' || line.front() == '#') {
                 continue;
             }
             // 处理节名 [section]
             if (line.size() >= 3 && line.front() == '[' && line.back() == ']') {
-                tag = trim(line.substr(1, line.size() - 2));
+                tag = StringUtil::trim(line.substr(1, line.size() - 2));
             } else {
                 // 处理键值对 key=value
                 auto at = line.find('=');
-                symbol = trim(tag + "." + line.substr(0, at));  // 生成键名，section.key格式
+                symbol = StringUtil::trim(tag + "." + line.substr(0, at));  // 生成键名，section.key格式
                 // 存储键值对
-                (*this)[symbol] = (at == std::string::npos ? std::string() : trim(line.substr(at + 1)));
+                (*this)[symbol] = (at == std::string::npos ? std::string() : StringUtil::trim(line.substr(at + 1)));
             }
         }
     }
@@ -40,7 +40,7 @@ public:
     void parseFile(const std::string& file_name = exePath() + ".ini") {
         std::ifstream in(file_name, std::ios::in | std::ios::binary | std::ios::ate);
         if (!in.good()) {
-            throw std::invalid_argument("Invalid ini file: " + filename);
+            throw std::invalid_argument("Invalid ini file: " + file_name);
         }
 
         auto size = in.tellg();

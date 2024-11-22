@@ -126,6 +126,8 @@ public:
     static std::string limitString(const char* name, size_t max_size);  // 截断过长的name,从中间截断替换为...
     static bool startWith(const std::string& str, const std::string& substr);
     static bool endWith(const std::string& str, const std::string& substr);
+    static std::string& trim(std::string& str, const std::string& chars = " \r\n\t");
+    static std::string trim(std::string&& str, const std::string& chars = " \r\n\t");
 
 private:
     StringUtil() = delete;
@@ -156,6 +158,20 @@ private:
     ThreadUtil() = delete;
     ~ThreadUtil() = delete;
 };
+
+// 将_type->name()转换为人类可读的名称
+std::string demangle(const char* mangled) {
+    int status = 0;  // 失败返回NULL
+    char* demangled = abi::__cxa_demangle(mangled, nullptr, nullptr, &status);  // 将mangled转换为人类可读的名称
+    std::string out;
+    if (status == 0 && demangled) {
+        out.append(demangled);
+        free(demangled);
+    } else {
+        out.append(mangled);
+    }
+    return out;
+}
 
 
 // 可以保存任意的对象, 通过set方法设置保存的对象, get方法获取保存的对象
@@ -236,20 +252,6 @@ public:
             return "";
         }
         return demangle(_type->name());
-    }
-
-    // 将_type->name()转换为人类可读的名称
-    std::string demangle(const char* mangled) {
-        int status = 0;  // 失败返回NULL
-        char* demangled = abi::__cxa_demangle(mangled, nullptr, nullptr, &status);  // 将mangled转换为人类可读的名称
-        std::string out;
-        if (status == 0 && demangled) {
-            out.append(demangled);
-            free(demangled);
-        } else {
-            out.append(mangled);
-        }
-        return out;
     }
 
 private:
