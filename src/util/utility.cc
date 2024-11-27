@@ -153,32 +153,18 @@ bool ThreadUtil::setThreadAffinity(int i) {
     return false;
 }
 
-/////////////////////////// BytesSpeed ///////////////////////////////////
-
-BytesSpeed& BytesSpeed::operator+=(size_t bytes) {
-    bytes_ += bytes;
-    if (bytes_ > 1024 * 1024) {
-        computeSpeed();
+// 将_type->name()转换为人类可读的名称
+std::string demangle(const char* mangled) {
+    int status = 0;  // 失败返回NULL
+    char* demangled = abi::__cxa_demangle(mangled, nullptr, nullptr, &status);  // 将mangled转换为人类可读的名称
+    std::string out;
+    if (status == 0 && demangled) {
+        out.append(demangled);
+        free(demangled);
+    } else {
+        out.append(mangled);
     }
-    return *this;
-}
-
-int BytesSpeed::getSpeed() {
-    if (ticker_.elapsedTime() < 1000) {
-        return speed_;
-    }
-    return computesSpeed();
-}
-
-int BytesSpeed::computeSpeed() {
-    auto elapsed = ticker_.elapsedTime();
-    if (!elapsed) {
-        return speed_;
-    }
-    speed_ = static_cast<int>(bytes_ * 1000 / elapsed);
-    ticker_.resetTime();
-    bytes_ = 0;
-    return speed_;
+    return out;
 }
 
 } // namespace xkernel

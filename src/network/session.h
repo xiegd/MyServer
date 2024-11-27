@@ -13,6 +13,7 @@ class Server;
 class TcpSession;
 class UdpSession;
 
+// session继承了SocketHelper的接口但是没有实现，所以需要其子类实现
 class Session : public SocketHelper {
 public:
     using Ptr = std::shared_ptr<Session>;
@@ -26,8 +27,8 @@ public:
 
 private:
     mutable std::string id_;
-    std::unique_ptr<ObjectCounter<xkernel::TcpSession>> tcp_counter_;
-    std::unique_ptr<ObjectCounter<xkernel::UdpSession>> udp_counter_;
+    std::unique_ptr<ObjectCounter<TcpSession>> tcp_counter_;
+    std::unique_ptr<ObjectCounter<UdpSession>> udp_counter_;
 };
 
 template <typename SessionType>

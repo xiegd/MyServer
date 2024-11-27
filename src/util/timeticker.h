@@ -4,8 +4,8 @@
 #include <cassert>
 #include <ctime>
 #include <string>
-#include "utility.h"
 #include "logger.h"
+#include "utility.h"
 
 namespace xkernel {
 class TimeUtil {

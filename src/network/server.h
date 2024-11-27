@@ -20,7 +20,7 @@ public:
 
 public:
     Session::Ptr get(const std::string& tag);
-    void forEachSession(const std::function<void(const std::string& id, const Session::Ptr& session>& cb));
+    void forEachSession(const std::function<void(const std::string& id, const Session::Ptr& session)>& cb);
 
 private:
     SessionMap() = default;

@@ -27,6 +27,7 @@ public:
     friend class TaskExecutorGetterImpl;
 
     enum class Poll_Event {
+        None_Event = 0,
         Read_Event = 1 << 0,
         Write_Event = 1 << 1,
         Error_Event = 1 << 2,
@@ -84,6 +85,26 @@ private:
     std::unordered_set<int> event_cache_expired_;  // 已过期事件的缓存
     std::multimap<uint64_t, DelayTask::Ptr> delay_task_map_;  // 定时任务映射 
 };
+
+
+constexpr EventPoller::Poll_Event operator|(EventPoller::Poll_Event lhs, EventPoller::Poll_Event rhs) {
+    return static_cast<EventPoller::Poll_Event>(
+        static_cast<std::underlying_type_t<EventPoller::Poll_Event>>(lhs)
+        | static_cast<std::underlying_type_t<EventPoller::Poll_Event>>(rhs)
+    );
+}
+
+constexpr EventPoller::Poll_Event operator&(EventPoller::Poll_Event lhs, EventPoller::Poll_Event rhs) {
+    return static_cast<EventPoller::Poll_Event>(
+        static_cast<std::underlying_type_t<EventPoller::Poll_Event>>(lhs)
+        & static_cast<std::underlying_type_t<EventPoller::Poll_Event>>(rhs)
+    );
+}
+
+// 重载!运算符，对event & Poll_event::xx后的结果判断事件是否包含对应的事件
+constexpr bool operator!(EventPoller::Poll_Event event) {
+    return static_cast<std::underlying_type_t<EventPoller::Poll_Event>>(event) != 0;
+}
 
 class EventPollerPool : public std::enable_shared_from_this<EventPollerPool>,
                         public TaskExecutorGetterImpl {

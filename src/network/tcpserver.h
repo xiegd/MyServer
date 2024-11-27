@@ -17,7 +17,7 @@ class TcpServer : public Server {
 public:
     using Ptr = std::shared_ptr<TcpServer>;
 
-    explicit TcpServer(EventPoller::Ptr& poller = nullptr);
+    explicit TcpServer(const EventPoller::Ptr& poller = nullptr);
     ~TcpServer() override;
 
 public:
@@ -25,7 +25,7 @@ public:
     void start(uint16_t port, const std::string& host = "::", uint32_t backlog = 1024,
                const std::function<void(std::shared_ptr<SessionType>&)>& cb = nullptr) {
         static std::string cls_name = xkernel::demangle(typeid(SessionType).name());
-        session_alloc_ = [cb] (const TcpServer::Ptr& server, const Socket::Ptr& sock) {
+        session_alloc_ = [cb] (const TcpServer::Ptr& server, const Socket::Ptr& sock) -> SessionHelper::Ptr {
             auto session = std::shared_ptr<SessionType>(
                 new SessionType(sock), [](SessionType* ptr) {
                     TraceP(static_cast<Session*>(ptr)) << "~" << cls_name;
@@ -35,7 +35,7 @@ public:
                 cb(session);
             }
             TraceP(static_cast<Session*>(session.get())) << cls_name;
-            session->setOnCreateSocket(server->on_create_socket);
+            session->setOnCreateSocket(server->on_create_socket_);
             return std::make_shared<SessionHelper>(server, std::move(session), cls_name);
         };
         start_l(port, host, backlog);
@@ -49,7 +49,7 @@ protected:
     virtual void cloneFrom(const TcpServer& that);
     virtual TcpServer::Ptr onCreateServer(const EventPoller::Ptr& poller);
     virtual Session::Ptr onAcceptConnection(const Socket::Ptr& sock);
-    virtual Socket::Ptr onBeforeAcceptConection(const EventPoller::Ptr& poller);
+    virtual Socket::Ptr onBeforeAcceptConnection(const EventPoller::Ptr& poller);
 
 private:
     void onManagerSession();

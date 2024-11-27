@@ -72,7 +72,7 @@ public:
             ssl_box_->onSend(std::move(buf));
             return size;
         }
-        return TcpClientType::send(std::mov(buf));
+        return TcpClientType::send(std::move(buf));
     }
 
     void startConnect(const std::string& url, uint16_t port, 
@@ -102,7 +102,7 @@ protected:
             });
 
             if (!SockUtil::isIP(host_.data())) {
-                ssl_box_->setHost(host.data());
+                ssl_box_->setHost(host_.data());
             }
         }
         TcpClientType::onConnect(ex);

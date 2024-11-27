@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "utility.h"
+#include "file.h"
 
 namespace xkernel {
 
@@ -37,7 +38,7 @@ public:
         }
     }
 
-    void parseFile(const std::string& file_name = exePath() + ".ini") {
+    void parseFile(const std::string& file_name = ExeFile::exePath() + ".ini") {
         std::ifstream in(file_name, std::ios::in | std::ios::binary | std::ios::ate);
         if (!in.good()) {
             throw std::invalid_argument("Invalid ini file: " + file_name);
@@ -77,7 +78,7 @@ public:
         return front + output + "\r\n" + footer + (footer.empty() ? "" : "\r\n");
     }
 
-    void dumpFile(const std::string& file_name = exePath() + ".ini") {
+    void dumpFile(const std::string& file_name = ExeFile::exePath() + ".ini") {
         std::ofstream out(file_name, std::ios::out | std::ios::binary | std::ios::trunc);
         auto dump = dump();
         out.write(dump.data(), dump.size());
@@ -94,7 +95,7 @@ private:
         }
 
         for (char ch : self) {
-            if (!map.at(uint8_t)ch) {
+            if (!map.at(uint8_t(ch))) {
                 tokens.back().push_back(ch);  // 如果不是分隔符，则添加到当前token中
             } else if (tokens.back().size()) {
                 tokens.push_back(std::string());  // 添加存储下一个token的空串

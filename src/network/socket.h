@@ -13,6 +13,7 @@
 #include "timer.h"
 #include "sockutil.h"
 #include "utility.h"
+#include "speed_statistic.h"
 
 namespace xkernel {
 
@@ -34,11 +35,11 @@ enum class ErrorCode {
     Other = 0xFF,  // 其他错误
 };
 
-class SocketException : public std::exception {
+class SockException : public std::exception {
 public:
-    SocketException(ErrorCode code = ErrorCode::Success, const std::string& msg = "", 
+    SockException(ErrorCode code = ErrorCode::Success, const std::string& msg = "", 
                     int custom_code = 0);
-    ~SocketException() override = default;
+    ~SockException() override = default;
 
 public:
     void reset(ErrorCode code, const std::string& msg, int custom_code = 0);
@@ -53,7 +54,7 @@ private:
     std::string msg_;
 };
 
-std::ostream& operator<<(std::ostream& os, const SocketException& ex);
+std::ostream& operator<<(std::ostream& os, const SockException& ex);
 
 // 封装socket fd和相应的socket类型
 class SockNum {
@@ -80,7 +81,7 @@ private:
 };
 
 // socket fd的包装类, 封装socket fd和poller, 析构时自动移除事件并关闭fd
-class SockFd : public NonCopyable {
+class SockFd : public Noncopyable {
 public:
     using Ptr = std::shared_ptr<SockFd>;
 
@@ -150,7 +151,7 @@ public:
     ErrorL << ptr->getIdentifier() << "(" << ptr->getPeerIp() << ":" << ptr->getPeerPort() << ")"
 
 class Socket : public std::enable_shared_from_this<Socket>,
-               public NonCopyable,
+               public Noncopyable,
                public SockInfo {
 public:
     using Ptr = std::shared_ptr<Socket>;
@@ -162,7 +163,7 @@ public:
     using onCreateSocket = std::function<Ptr(const EventPoller::Ptr& poller)>;
     using onSendResult = BufferList::SendResult;
 
-    static Ptr CreateSocket(const EventPoller::Ptr& poller = nullptr, bool enable_mutex = true);
+    static Ptr createSocket(const EventPoller::Ptr& poller = nullptr, bool enable_mutex = true);
     ~Socket();
 
 public:
@@ -182,7 +183,7 @@ public:
     void setOnBeforeAccept(onCreateSocket cb);
     void setOnSendResult(onSendResult cb);
     // 发送数据相关接口, 将buffer添加到发送缓冲，尝试发送
-    ssize_t send(const void* buf, size_t size = 0,
+    ssize_t send(const char* buf, size_t size = 0,
                 struct sockaddr* addr = nullptr, socklen_t addr_len = 0,
                 bool try_flush = true);
     ssize_t send(std::string buf, struct sockaddr* addr = nullptr,
@@ -193,7 +194,7 @@ public:
     bool emitErr(const SockException& err) noexcept;  // 安全添加错误事件，避免重复触发错误回调
     void enableRecv(bool enabled);  // 设置是否启用接收监听socket可读事件
     int rawFd() const;
-    int alive() const;  // 检查socket是否处于alive状态
+    bool alive() const;  // 检查socket是否处于alive状态
     SockNum::SockType sockType() const;
     void setSendTimeOutSecond(uint32_t second);  
     bool isSocketBusy() const;  // 检查socket是否繁忙, 即是否可以直接发送数据(不通过缓冲区)
@@ -215,7 +216,7 @@ public:
 private:
     Socket(EventPoller::Ptr poller, bool enable_mutex = true);
     void setSock(SockNum::Ptr sock);  // 设置sock_fd_和local_addr_、peer_addr_
-    int onAccept(const SockNum::Ptr& sock, int event) noexcept;  // TCP_Server类型的socket监听到Read_Event事件的回调
+    int onAccept(const SockNum::Ptr& sock, EventPoller::Poll_Event event) noexcept;  // TCP_Server类型的socket监听到Read_Event事件的回调
     ssize_t onRead(const SockNum::Ptr& sock, const SocketRecvBuffer::Ptr& buffer) noexcept;  // TCP/UDP socket监听到Read_Event事件的回调
     void onWriteAble(const SockNum::Ptr& sock);  // socket可写事件触发时的回调
     void onConnected(const SockNum::Ptr& sock, const onErrCb& cb);  // TCP异步连接完成回调

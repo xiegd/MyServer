@@ -24,7 +24,7 @@ public:
         static std::string cls_name = xkernel::demangle(typeid(SessionType).name());
         session_alloc_ = [cb](const UdpServer::Ptr& server, const Socket::Ptr& sock) {
             auto session = std::shared_ptr<SessionType>(
-                new SessionType(sock), [cls_name](SessionType* ptr) {
+                new SessionType(sock), [](SessionType* ptr) {
                     TraceP(static_cast<Session*>(ptr)) << "~" << cls_name;
                     delete ptr;
                 });
@@ -52,7 +52,7 @@ private:
     void start_l(uint16_t port, const std::string& host = "::");
     void onManagerSession();
     void onRead(Buffer::Ptr& buf, struct sockaddr* addr, int addr_len);
-    void OnRead_l(bool is_server_fd, const PeerIdType& id, Buffer::Ptr& buf,
+    void onRead_l(bool is_server_fd, const PeerIdType& id, Buffer::Ptr& buf,
                   struct sockaddr* addr, int addr_len);
     SessionHelper::Ptr getOrCreateSession(const PeerIdType& id, Buffer::Ptr& buf,
                                           struct sockaddr* addr, int addr_len, bool& is_new);

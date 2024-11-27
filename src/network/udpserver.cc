@@ -2,29 +2,34 @@
 #include "utility.h"
 #include "eventpoller.h"
 #include "logger.h"
+#include "uv_errno.h"
 
 namespace xkernel {
+
+STATISTIC_IMPL(UdpServer)
 
 // ipv4映射到ipv6的固定前缀
 static const uint8_t s_in6_addr_maped[] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                                            0x00, 0x00, 0x00, 0x00, 0xff, 0xff,
                                            0x00, 0x00, 0x00, 0x00};
 
+static constexpr auto kUdpDelayCloseMs = 3 * 1000;
+
 static UdpServer::PeerIdType makeSockId(struct sockaddr* addr, int addr_len) {
     UdpServer::PeerIdType ret;
     ret.resize(18);
     switch (addr->sa_family) {
         case AF_INET: {
-            ret[0] = static_cast<sockaddr_in*>(addr)->sin_port >> 8;
-            ret[1] = static_cast<sockaddr_in*>(addr)->sin_port & 0xFF;
+            ret[0] = reinterpret_cast<sockaddr_in*>(addr)->sin_port >> 8;
+            ret[1] = reinterpret_cast<sockaddr_in*>(addr)->sin_port & 0xFF;
             memcpy(&ret[2], &s_in6_addr_maped, 12);  // 填充前缀
-            memcpy(&ret[14], &static_cast<sockaddr_in*>(addr)->sin_addr, 4);  // 填充ip
+            memcpy(&ret[14], &reinterpret_cast<sockaddr_in*>(addr)->sin_addr, 4);  // 填充ip
             return ret;
         }
         case AF_INET6: {
-            ret[0] = static_cast<sockaddr_in6*>(addr)->sin6_port >> 8;
-            ret[1] = static_cast<sockaddr_in6*>(addr)->sin6_port & 0xFF;
-            memcpy(&ret[2], &static_cast<sockaddr_in6*>(addr)->sin6_addr, 16);
+            ret[0] = reinterpret_cast<sockaddr_in6*>(addr)->sin6_port >> 8;
+            ret[1] = reinterpret_cast<sockaddr_in6*>(addr)->sin6_port & 0xFF;
+            memcpy(&ret[2], &reinterpret_cast<sockaddr_in6*>(addr)->sin6_addr, 16);
             return ret;
         }
         default:
@@ -92,7 +97,7 @@ void UdpServer::cloneFrom(const UdpServer& that) {
     this->mIni::operator=(that);  // 复制配置
 }
 
-void UdpServer::start_l(uint16_t port, const std::string& host = "::") {
+void UdpServer::start_l(uint16_t port, const std::string& host) {
     setupEvent();
     // 主server才创建session map，其他cloned server共享
     session_mutex_ = std::make_shared<std::recursive_mutex>();
@@ -187,7 +192,7 @@ static void emitSessionRecv(const SessionHelper::Ptr& helper, const Buffer::Ptr&
     }
 }
 
-void UdpServer::OnRead_l(bool is_server_fd, const PeerIdType& id, Buffer::Ptr& buf,
+void UdpServer::onRead_l(bool is_server_fd, const PeerIdType& id, Buffer::Ptr& buf,
               struct sockaddr* addr, int addr_len) {
     bool is_new = false;
     if (auto helper = getOrCreateSession(id, buf, addr, addr_len, is_new)) {
@@ -232,7 +237,7 @@ SessionHelper::Ptr UdpServer::createSession(
         return nullptr;
     }
 
-    auto addr_str = string(static_cast<char*>(addr), addr_len);
+    auto addr_str = std::string(reinterpret_cast<char*>(addr), addr_len);
     std::weak_ptr<UdpServer> weak_self = std::static_pointer_cast<UdpServer>(shared_from_this());
     auto helper_creator = [this, weak_self, socket, addr_str, id]() -> SessionHelper::Ptr {
         auto server = weak_self.lock();
@@ -249,13 +254,13 @@ SessionHelper::Ptr UdpServer::createSession(
 
         assert(server->socket_);
         socket->bindUdpSock(server->socket_->getLocalPort(), socket_->getLocalIp());
-        socket->bindPeerAddr(static_cast<struct sockaddr*>(addr_str.data()), addr_str.size());
+        socket->bindPeerAddr(reinterpret_cast<const struct sockaddr*>(addr_str.data()), addr_str.size());
         auto helper = session_alloc_(server, socket);
         helper->session()->attachServer(*this);  // 把本服务器的配置传递给 Session
 
         std::weak_ptr<SessionHelper> weak_helper = helper;
         socket->setOnRead([weak_self, weak_helper, id](
-            Buffer::Ptr& buf, struct sockaddr* addr, int adr_len) {
+            Buffer::Ptr& buf, struct sockaddr* addr, int addr_len) {
                 auto strong_self = weak_self.lock();
                 if (!strong_self) {
                     return ;
@@ -291,7 +296,7 @@ SessionHelper::Ptr UdpServer::createSession(
             if (auto strong_helper = weak_helper.lock()) {
                 TraceP(strong_helper->session()) << strong_helper->className() << "on error: " << err;
                 strong_helper->enable = false;
-                strong_helper->session()->onError(err);
+                strong_helper->session()->onErr(err);
             }
         });
         auto pr = session_map_->emplace(id, std::move(helper));

@@ -6,6 +6,7 @@ namespace xkernel {
 
 using mIni = IniBasic<std::string, variant>;
 
+template <>
 mIni& IniBasic<std::string, variant>::Instance() {
     static mIni instance;
     return instance;

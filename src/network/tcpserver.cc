@@ -2,13 +2,15 @@
 
 #include <exception>
 
+#include "uv_errno.h"
+
 namespace xkernel {
 
-INSTANCE_IMP(SessionMap)  // ???
+// INSTANCE_IMP(SessionMap)  // ???
 STATISTIC_IMPL(TcpServer)
 
 
-TcpServer::TcpServer(EventPoller::Ptr& poller) : Server(poller){
+TcpServer::TcpServer(const EventPoller::Ptr& poller) : Server(poller) {
     multi_poller_ = !poller;
     setOnCreateSocket(nullptr);
 }
@@ -68,10 +70,10 @@ Session::Ptr TcpServer::onAcceptConnection(const Socket::Ptr& sock) {
         }
         try {
             strong_session->onRecv(buf);
-        } catch (SocketException& ex) {
+        } catch (SockException& ex) {
             strong_session->shutdown(ex);
         } catch (std::exception& ex) {
-            strong_session->shutdown(SocketException(ErrorCode::Shutdown, ex.what()));
+            strong_session->shutdown(SockException(ErrorCode::Shutdown, ex.what()));
         }
     });
 
@@ -102,14 +104,50 @@ Session::Ptr TcpServer::onAcceptConnection(const Socket::Ptr& sock) {
         auto strong_session = weak_session.lock();
         if (strong_session) {
             TraceP(strong_session) << cls << "on err: " << err;
-            strong_session->onError(err);
+            strong_session->onErr(err);
         }
     });
     return session;
 }
 
 void TcpServer::start_l(uint16_t port, const std::string& host, uint32_t backlog) {
+    setupEvent();
 
+    std::weak_ptr<TcpServer> weak_self = std::static_pointer_cast<TcpServer>(shared_from_this());
+    timer_ = std::make_shared<Timer>(2.0f, [weak_self]() -> bool {
+        auto strong_self = weak_self.lock();
+        if (!strong_self) {
+            return false;
+        }
+        strong_self->onManagerSession();
+        return true;
+    }, poller_);
+
+    if (multi_poller_) {
+        EventPollerPool::Instance().forEach([&](const TaskExecutor::Ptr& executor) {
+            EventPoller::Ptr poller = std::static_pointer_cast<EventPoller>(executor);
+            if (poller == poller_) {
+                return ;
+            }
+            auto& server_ref = cloned_server_[poller.get()];
+            if (!server_ref) {
+                server_ref = onCreateServer(poller);
+            }
+            if (server_ref) {
+                server_ref->cloneFrom(*this);
+            }
+        });
+    }
+
+    if (!socket_->listen(port, host.c_str(), backlog)) {
+        std::string err = (StrPrinter << "Listen on " << host << " " << port
+                                      << " failed: " << get_uv_errmsg(true));
+        throw std::runtime_error(err);
+    }
+    for (auto& pr : cloned_server_) {
+        pr.second->socket_->cloneSocket(*socket_);
+    }
+    InfoL << "TCP server listening on [" << host << "]: " << port;
 }
 
 void TcpServer::cloneFrom(const TcpServer& that) {
@@ -118,8 +156,8 @@ void TcpServer::cloneFrom(const TcpServer& that) {
     }
     setupEvent();
     main_server_ = false;
-    on_create_socket_ = that.on_create_socket;
-    session_alloc_ = that.session_alloc;
+    on_create_socket_ = that.on_create_socket_;
+    session_alloc_ = that.session_alloc_;
     std::weak_ptr<TcpServer> weak_self = std::static_pointer_cast<TcpServer>(shared_from_this());
     timer_ = std::make_shared<Timer>(2.0f, [weak_self]() -> bool {
         auto strong_self = weak_self.lock();
@@ -130,10 +168,10 @@ void TcpServer::cloneFrom(const TcpServer& that) {
         return true;
     }, poller_);
     this->mIni::operator=(that);  // ???
-    parent_ = static_pointer_cast<TcpServer>(const_cast<TcpServer&>(that).shared_from_this());
+    parent_ = std::static_pointer_cast<TcpServer>(const_cast<TcpServer&>(that).shared_from_this());
 }
 
-Socket::Ptr TcpServer::onBeforeAcceptConection(const EventPoller::Ptr& poller) {
+Socket::Ptr TcpServer::onBeforeAcceptConnection(const EventPoller::Ptr& poller) {
     assert(poller_->isCurrentThread());
     return createSocket(multi_poller_ ? EventPollerPool::Instance().getPoller(false) : poller_);
 }
@@ -151,7 +189,7 @@ void TcpServer::onManagerSession() {
 }
 
 Session::Ptr TcpServer::createSession(const Socket::Ptr& socket) {
-    return getServer(socket->getPoller().get())->onAcceptConnection(sock);
+    return getServer(socket->getPoller().get())->onAcceptConnection(socket);
 }
 
 Socket::Ptr TcpServer::createSocket(const EventPoller::Ptr& poller) {
@@ -171,7 +209,7 @@ TcpServer::Ptr TcpServer::getServer(const EventPoller* poller) const {
 }
 
 void TcpServer::setupEvent() {
-    socket_ = createSocket(poller_);
+    socket_ = createSocket(poller_);  // 调用构造tcpserver时初始化的_on_create_socket回调函数创建socket
     std::weak_ptr<TcpServer> weak_self = std::static_pointer_cast<TcpServer>(shared_from_this());
     socket_->setOnBeforeAccept([weak_self](const EventPoller::Ptr& poller) -> Socket::Ptr {
         if (auto strong_self = weak_self.lock()) {

@@ -30,6 +30,8 @@ char* BufferSock::data() const { return buffer_->data(); }
 size_t BufferSock::size() const { return buffer_->size(); }
 const struct sockaddr* BufferSock::sockaddr() const { return reinterpret_cast<const struct sockaddr*>(&addr_); }
 socklen_t BufferSock::socklen() const { return addr_len_; }
+std::string BufferSock::toString() const { return buffer_->toString(); }
+size_t BufferSock::getCapacity() const { return buffer_->getCapacity(); }
 
 ///////////////////////////////////// SocketRecvBuffer //////////////////////////////////////
 

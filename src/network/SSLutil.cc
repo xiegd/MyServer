@@ -37,55 +37,132 @@ std::string SSLUtil::getLastError() {
     }
 }
 
-std::vector<SSLUtil::X509_Ptr> SSLUtil::loadPublicKey(const std::string path_or_data,
-    const std::string& passwd, bool is_file) {
-    vector<SSLUtil::X509_Ptr> ret;
 #if defined(ENABLE_OPENSSL)
-    BIO* bio = is_file ? BIO_new_file(path_or_data.data(), "r")
-                       : BIO_new_mem_buf(file_path_or_data.data(), file_path_or_data.size());
+static int getCerType(BIO* bio, const char* passwd, X509** x509, int type) {
+    // 尝试pem格式
+    if (type == 1 || type == 0) {
+        if (type == 0) {
+            BIO_reset(bio);
+        }
+        // 尝试PEM格式
+        *x509 = PEM_read_bio_X509(bio, nullptr, nullptr, nullptr);
+        if (*x509) {
+            return 1;
+        }
+    }
+
+    if (type == 2 || type == 0) {
+        if (type == 0) {
+            BIO_reset(bio);
+        }
+        // 尝试DER格式
+        *x509 = d2i_X509_bio(bio, nullptr);
+        if (*x509) {
+            return 2;
+        }
+    }
+
+    if (type == 3 || type == 0) {
+        if (type == 0) {
+            BIO_reset(bio);
+        }
+        // 尝试p12格式
+        PKCS12* p12 = d2i_PKCS12_bio(bio, nullptr);
+        if (p12) {
+            EVP_PKEY* pkey = nullptr;
+            PKCS12_parse(p12, passwd, &pkey, x509, nullptr);
+            PKCS12_free(p12);
+            if (pkey) {
+                EVP_PKEY_free(pkey);
+            }
+            if (*x509) {
+                return 3;
+            }
+        }
+    }
+
+    return 0;
+}
+#endif
+
+std::vector<SSLUtil::X509_Ptr> SSLUtil::loadPublicKey(const std::string& path_or_data,
+    const std::string& passwd, bool is_file) {
+    std::vector<SSLUtil::X509_Ptr> ret;
+#if defined(ENABLE_OPENSSL)
+    BIO* bio = is_file ? BIO_new_file(const_cast<char*>(path_or_data.data()), "r")
+                       : BIO_new_mem_buf(const_cast<char*>(path_or_data.data()), path_or_data.size());
     if (!bio) {
         WarnL << (is_file ? "BIO_new_file" : "BIO_new_mem_buf") << "failed: " << getLastError();
         return ret;
     }
 
-    pem_password_cb* cb = [](char* buf, int size, int rwflag, void* userdata) -> int {
-        const string* passwd = static_cast<const string*>(userdata);
-        size = size < (int)passwd->size() ? size : (int) passwd->size();
-        memcpy(buf, passwd->data(), size);
-        return size;
-    }
-
     onceToken token0(nullptr, [&]() { BIO_free(bio); });  // 析构时释放BIO对象
-    EVP_KEY* evp_key = PEM_read_bio_PrivateKey(bio, nullptr, cb, (void*)&passwd);  // 尝试pem格式
-    if (evp_key) {
-        return std::shared_ptr<EVP_PKEY>(evp_key, [](EVP_PKEY* ptr) { EVP_PKEY_free(ptr); });
-    }
-    // 尝试p12格式
-    BIO_reset(bio);
-    PKCS12* p12 = d2i_PKCS12_bio(bio, nullptr);
-    if (!p12) {
-        return nullptr;
-    }
-    X509* x509 = nullptr;
-    PKCS12_parse(p12, passwd.data(), &evp_key, &x509, nullptr);
-    PKCS12_free(p12);
-    if (x509) {
-        X509_free(x509);
-    }
 
-    return !evp_key ? nullptr : std::shared_ptr<EVP_PKEY>(evp_key, [](EVP_PKEY* ptr) { EVP_PKEY_free(ptr); });
+    int cer_type = 0;
+    X509* x509 = nullptr;
+    do {
+        cer_type = getCerType(bio, passwd.data(), &x509, cer_type);
+        if (cer_type) {
+            ret.push_back(X509_Ptr(x509, [](X509* ptr) { X509_free(ptr); }));
+        }
+    } while (cer_type != 0);
+
+    return ret;
 #else 
-    return nullptr;
+    return ret;
 #endif  // defined(ENABLE_OPENSSL)
 }
 
-SSLUtil::EVP_PKEY_Ptr SSLUtil::makeSSLContext(const std::vector<X509_Ptr>& cers, 
+SSLUtil::EVP_PKEY_Ptr SSLUtil::loadPrivateKey(const std::string& path_or_data,
+                                              const std::string& passwd, bool is_file) {
+#if defined(ENABLE_OPENSSL)
+    BIO* bio = is_file ? BIO_new_file(const_cast<char*>(path_or_data.data()), "r")
+                       : BIO_new_mem_buf(const_cast<char*>(path_or_data.data()), path_or_data.size());
+    
+    if (!bio) {
+        WarnL << (is_file ? "BIO_new_file" : "BIO_new_mem_buf") << "failed: " << getLastError();
+        return nullptr;
+    }
+    // 密码回调函数，用于将用户数据中的密码复制到buf中
+    pem_password_cb* cb = [](char* buf, int size, int rwflag, void* userdata) -> int {
+        const std::string* passwd = reinterpret_cast<const std::string*>(userdata);
+        size = size < passwd->size() ? size : passwd->size();
+        memcpy(buf, passwd->data(), size);
+        return size;
+    };
+
+    onceToken token0(nullptr, [&]() { BIO_free(bio); });
+    // 尝试pem格式
+    EVP_PKEY* evp_key = PEM_read_bio_PrivateKey(bio, nullptr, cb, (void*)&passwd);
+    if (!evp_key) {
+        BIO_reset(bio);  // 重置BIO对象
+        PKCS12* p12 = d2i_PKCS12_bio(bio, nullptr);
+        if (!p12) {
+            return nullptr;
+        }
+        X509* x509 = nullptr;
+        PKCS12_parse(p12, passwd.data(), &evp_key, &x509, nullptr);  // 解析PKCS12结构体，提取私钥和证书
+        PKCS12_free(p12);
+        if (x509) {
+            X509_free(x509);
+        }
+        if (!evp_key) {
+            return nullptr;
+        }
+    }
+    return std::shared_ptr<EVP_PKEY>(evp_key, [](EVP_PKEY* ptr) { EVP_PKEY_free(ptr); });
+#else
+    return nullptr;
+#endif
+}
+
+SSLUtil::SSL_CTX_Ptr SSLUtil::makeSSLContext(const std::vector<X509_Ptr>& cers, 
     const EVP_PKEY_Ptr& key, bool server_mode, bool check_key) {
 #if defined(ENABLE_OPENSSL)
     SSL_CTX* ctx = SSL_CTX_new(server_mode ? SSLv23_server_method() : SSLv23_client_method());
     if (!ctx) {
         WarnL << "SSL_CTX_new" << (server_mode ? "SSLv23_server_method" : "SSLv23_client_method") 
-        << "failed: " << getLastError();
+              << "failed: " << getLastError();
         return nullptr;
     }
     int i = 0;

@@ -4,8 +4,7 @@ namespace xkernel {
 
 //////////////////////////////////// SessionMap //////////////////////////////////////////
 
-
-SessionMap& SessionMap::Instance();
+INSTANCE_IMP(SessionMap);
 
 Session::Ptr SessionMap::get(const std::string& tag) {
     std::lock_guard<decltype(mtx_session_)> lck(mtx_session_);
@@ -54,7 +53,7 @@ SessionHelper::SessionHelper(const std::weak_ptr<Server>& server,
 
 SessionHelper::~SessionHelper() {
     if (!server_.lock()) {
-        session_->onError(SockException());
+        session_->onErr(SockException());
     }
     session_map_->del(identifier_);
 }

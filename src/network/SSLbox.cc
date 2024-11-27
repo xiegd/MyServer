@@ -4,6 +4,7 @@
 
 #include "SSLutil.h"
 #include "utility.h"
+#include "logger.h"
 
 #define ENABLE_OPENSSL
 
@@ -48,8 +49,8 @@ SSLInitor::SSLInitor() {
     });
     // 设置获取线程ID回调函数
     CRYPTO_set_id_callback([]() -> unsigned long { return static_cast<unsigned long>(pthread_self()); }); 
-    setContext("", SSLUtil::makeSSLContext(vector<shared_ptr<X509>>(), nullptr, false), false);
-    setContext("", SSLUtil::makeSSLContext(vector<shared_ptr<X509>>(), nullptr, true), true);
+    setContext("", SSLUtil::makeSSLContext(std::vector<std::shared_ptr<X509>>(), nullptr, false), false);
+    setContext("", SSLUtil::makeSSLContext(std::vector<std::shared_ptr<X509>>(), nullptr, true), true);
 #endif  // defined(ENABLE_OPENSSL)
 }
 
@@ -69,7 +70,7 @@ bool SSLInitor::loadCertificate(const std::string& pem_or_p12, bool server_mode,
                      const std::string& password, bool is_file, bool is_default) {
     auto cers = SSLUtil::loadPublicKey(pem_or_p12, password, is_file);
     auto key = SSLUtil::loadPrivateKey(pem_or_p12, password, is_file);
-    auto ssl_ctx = SSLUtil::makSSLContext(cers, key, server_mode, true);
+    auto ssl_ctx = SSLUtil::makeSSLContext(cers, key, server_mode, true);
     if (!ssl_ctx) {
         return false;
     }
@@ -127,7 +128,7 @@ std::shared_ptr<SSL_CTX> SSLInitor::getSSLCtx_l(const std::string& vhost_in, boo
 
 std::shared_ptr<SSL> SSLInitor::makeSSL(bool server_mode) {
 #if defined(ENABLE_OPENSSL)
-    return SSLUtil::makeSSL(ctx_empty_[server_mode]).get();
+    return SSLUtil::makeSSL(ctx_empty_[server_mode].get());
 #else
     return nullptr;
 #endif
@@ -342,7 +343,7 @@ void SSLBox::flush() {
     if (is_flush_) {
         return ;
     }
-    onceToken token([&]() { is_flush_ = true; }, [&]() { is_flush = false; });
+    onceToken token([&]() { is_flush_ = true; }, [&]() { is_flush_ = false; });
     flushReadBio();
     if (!SSL_is_init_finished(ssl_.get()) || buffer_send_.empty()) {
         flushWriteBio();

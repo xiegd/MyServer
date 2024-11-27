@@ -330,8 +330,8 @@ void EventPoller::addEventPipe() {
 }
 
 //////////////////////////////// EventPollerPool /////////////////////////////
-// 
-// static size_t s_pool_size = 0;
+
+static size_t s_pool_size = 0;
 static bool s_enable_cpu_affinity = true;
 
 INSTANCE_IMP(EventPollerPool)

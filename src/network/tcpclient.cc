@@ -41,7 +41,7 @@ void TcpClient::startConnect(const std::string& url, uint16_t port,
         }
         strong_self->timer_.reset();
         TraceL << strong_self->getIdentifier() << " on err: " << ex;
-        strong_self->onError(ex);
+        strong_self->onErr(ex);
     });
 
     TraceL << getIdentifier() << " start connect " << url << ":" << port;
@@ -110,11 +110,14 @@ bool TcpClient::alive() const {
     return sock && sock->alive();
 }
 
-void TcpClient::setNetAdapter(const std::string& local_ip);
+void TcpClient::setNetAdapter(const std::string& local_ip) {
+    net_adapter_ = local_ip;
+}
+
 std::string TcpClient::getIdentifier() const {
     if (id_.empty()) {
         static std::atomic<uint64_t> s_index{0};
-        id_ = xkernel::demangle(typeid(*this).name() + "-" + std::to_string(++s_index));
+        id_ = xkernel::demangle(typeid(*this).name())+ "-" + std::to_string(++s_index);
     }
     return id_;
 }

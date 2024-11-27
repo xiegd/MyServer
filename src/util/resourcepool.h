@@ -25,7 +25,7 @@ public:
     shared_ptr_impl(C* ptr, const std::weak_ptr<ResourcePool_l<C>>& weakPool, 
                    std::shared_ptr<std::atomic_bool> quit, 
                    const std::function<void(C*)>& on_recycle) 
-        : std::shared_ptr<C>(ptr, [weakPool, quit on_recycle](C* ptr) {
+        : std::shared_ptr<C>(ptr, [weakPool, quit, on_recycle](C* ptr) {
             if (on_recycle) {
                 on_recycle(ptr);
             }
@@ -53,7 +53,7 @@ public:
     friend class ResourcePool<C>;
     using ValuePtr = shared_ptr_impl<C>;
 
-    ResourcePool_l() { alloc_ = []() -> C* { return new C(); } };
+    ResourcePool_l() { alloc_ = []() -> C* { return new C(); }; }
     // 使用自定义参数创建对象
     template <typename... ArgTypes>
     ResourcePool_l(ArgTypes&&... args) {
@@ -155,7 +155,7 @@ public:
 
 private:
     std::shared_ptr<ResourcePool_l<C>> pool_;
-}
+};
 
 }  // namespace xkernel
 #endif

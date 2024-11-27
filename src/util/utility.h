@@ -14,6 +14,7 @@
 #include <sstream>
 
 namespace xkernel {
+
 // 禁止拷贝的工具类，父类拷贝/赋值是delete则派生类无法生成默认的构造/赋值
 class Noncopyable {
 // 声明为protected, 不能直接创建类实例
@@ -100,7 +101,7 @@ private:
 };
 
 // 对象计数器特化
-#define STATISTIC_IMPL(Type)                                    \
+#define STATISTIC_IMPL(Type)                                   \
     template <>                                                \
     std::atomic<size_t>& ObjectCounter<Type>::getCounter() {   \
         static std::atomic<size_t> instance(0);                \
@@ -159,20 +160,7 @@ private:
     ~ThreadUtil() = delete;
 };
 
-// 将_type->name()转换为人类可读的名称
-std::string demangle(const char* mangled) {
-    int status = 0;  // 失败返回NULL
-    char* demangled = abi::__cxa_demangle(mangled, nullptr, nullptr, &status);  // 将mangled转换为人类可读的名称
-    std::string out;
-    if (status == 0 && demangled) {
-        out.append(demangled);
-        free(demangled);
-    } else {
-        out.append(mangled);
-    }
-    return out;
-}
-
+std::string demangle(const char* mangled);
 
 // 可以保存任意的对象, 通过set方法设置保存的对象, get方法获取保存的对象
 // 实现了类型擦除
@@ -286,23 +274,6 @@ public:
 
 private:
     std::stringstream stream_;
-};
-
-// 计算数据传输实时速度的工具类
-class BytesSpeed {
-public:
-    BytesSpeed();
-    ~BytesSpeed();
-    BytesSpeed& operator+=(size_t bytes);
-    int getSpeed();
-
-private:
-    int computeSpeed();
-
-private:
-    int speed_;
-    size_t bytes_;
-    Ticker ticker_;
 };
 
 } // namespace xkernel

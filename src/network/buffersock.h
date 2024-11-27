@@ -41,6 +41,8 @@ public:
 public:
     char* data() const override;
     size_t size() const override;
+    std::string toString() const override;
+    size_t getCapacity() const override;
     const struct sockaddr* sockaddr() const;
     socklen_t socklen() const;
 
