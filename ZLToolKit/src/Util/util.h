@@ -239,6 +239,15 @@ class ObjectStatistic {
 
 // 接受一个Type类型对象，为特定类型生成getCounter方法的特化实现, 生成一个std::atomic<size_t>类型的静态成员变量instance
 // 第一次调用时初始化instance，
+// 必须在定义ObjectStatistic模板类之后, 在对应的.cc文件中使用这个宏，这样
+// 在编译时，编译器会根据模板特化生成对应的getCounter方法
+// 如果直接实现，getCounter方法, 则这里的是函数内的静态变量，每个包含头文件的编译单元都会生成一个instance
+// .cc文件inlcude时，只是把代码插入到前面，每个.cc文件独立编译，然后链接，在执行代码时，
+// 来自不同.cc文件的同一类型的ObjectStatistic对象在执行getCounter方法时，会单独初始化static 的instance
+// 导致计数错误
+
+// 所以getCounter方法不能写在.h文件中，但是模板类方法不能分离写在.cc文件中，因为实例化模板在编译时进行
+// 所以把getCounter方法写在对应使用了实例化的ObjectStatistic类的.cc文件中，避免了上述问题
 #define StatisticImp(Type)                                     \
     // 模板参数为空，表示的时模板特化，在声明`ObjectStatistic模板类时已经特化了
     template <>                                                \

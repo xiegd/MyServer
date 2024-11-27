@@ -18,8 +18,7 @@
 
 namespace toolkit {
 
-// Tcp客户端，Socket对象默认开始互斥锁  [AUTO-TRANSLATED:5cc9a824]
-// Tcp client, Socket object defaults to starting mutex lock
+// Tcp客户端，Socket对象默认开始互斥锁  
 class TcpClient : public SocketHelper {
    public:
     using Ptr = std::shared_ptr<TcpClient>;
@@ -32,13 +31,6 @@ class TcpClient : public SocketHelper {
      * @param port 服务器端口
      * @param timeout_sec 超时时间,单位秒
      * @param local_port 本地端口
-     * Start connecting to the TCP server
-     * @param url Server IP or domain name
-     * @param port Server port
-     * @param timeout_sec Timeout time, in seconds
-     * @param local_port Local port
-
-     * [AUTO-TRANSLATED:7aa87355]
      */
     virtual void startConnect(const std::string &url, uint16_t port,
                               float timeout_sec = 5, uint16_t local_port = 0);
@@ -50,14 +42,6 @@ class TcpClient : public SocketHelper {
      * @proxy_port 代理端口
      * @param timeout_sec 超时时间,单位秒
      * @param local_port 本地端口
-     * Start connecting to the TCP server through a proxy
-     * @param url Server IP or domain name
-     * @proxy_host Proxy IP
-     * @proxy_port Proxy port
-     * @param timeout_sec Timeout time, in seconds
-     * @param local_port Local port
-
-     * [AUTO-TRANSLATED:2739bd58]
      */
     virtual void startConnectWithProxy(const std::string &url,
                                        const std::string &proxy_host,
@@ -68,38 +52,23 @@ class TcpClient : public SocketHelper {
     /**
      * 主动断开连接
      * @param ex 触发onErr事件时的参数
-     * Actively disconnect the connection
-     * @param ex Parameter when triggering the onErr event
-
-     * [AUTO-TRANSLATED:5f6f3017]
      */
     void shutdown(const SockException &ex =
                       SockException(Err_shutdown, "self shutdown")) override;
 
     /**
      * 连接中或已连接返回true，断开连接时返回false
-     * Returns true if connected or connecting, returns false if disconnected
-
-     * [AUTO-TRANSLATED:60595edc]
      */
     virtual bool alive() const;
 
     /**
      * 设置网卡适配器,使用该网卡与服务器通信
      * @param local_ip 本地网卡ip
-     * Set the network card adapter, use this network card to communicate with
-     the server
-     * @param local_ip Local network card IP
-
-     * [AUTO-TRANSLATED:2549c18d]
      */
     virtual void setNetAdapter(const std::string &local_ip);
 
     /**
      * 唯一标识
-     * Unique identifier
-
-     * [AUTO-TRANSLATED:6b21021f]
      */
     std::string getIdentifier() const override;
 
@@ -107,18 +76,11 @@ class TcpClient : public SocketHelper {
     /**
      * 连接服务器结果回调
      * @param ex 成功与否
-     * Connection result callback
-     * @param ex Success or failure
-
-     * [AUTO-TRANSLATED:103bb2cb]
      */
     virtual void onConnect(const SockException &ex) = 0;
 
     /**
      * tcp连接成功后每2秒触发一次该事件
-     * Trigger this event every 2 seconds after a successful TCP connection
-
-     * [AUTO-TRANSLATED:37b40b5d]
      */
     void onManager() override {}
 
@@ -129,13 +91,12 @@ class TcpClient : public SocketHelper {
     mutable std::string _id;
     std::string _net_adapter = "::";
     std::shared_ptr<Timer> _timer;
-    //对象个数统计  [AUTO-TRANSLATED:3b43e8c2]
-    // Object count statistics
+    //对象个数统计
     ObjectStatistic<TcpClient> _statistic;
 };
 
-//用于实现TLS客户端的模板对象  [AUTO-TRANSLATED:e4d399a3]
-// Template object for implementing TLS client
+//用于实现TLS客户端的模板对象
+// 继承自TcpClient
 template <typename TcpClientType>
 class TcpClientWithSSL : public TcpClientType {
    public:
@@ -159,8 +120,12 @@ class TcpClientWithSSL : public TcpClientType {
         }
     }
 
-    // 使能其他未被重写的send函数  [AUTO-TRANSLATED:5f01f91b]
-    // Enable other unoverridden send functions
+    // 使能其他未被重写的send函数
+    // 名称继承，将基类中特定名称引入到派生类的作用域中
+    // 引入除了被override的版本外的其他版本，
+    // 使用这种方法可以避免名称隐藏，即派生类中重载的版本会隐藏基类中所有的同名版本
+    // 选择性继承，即继承除了被override的版本外的其他版本
+    // 修改访问权限, 
     using TcpClientType::send;
 
     ssize_t send(Buffer::Ptr buf) override {
@@ -173,9 +138,6 @@ class TcpClientWithSSL : public TcpClientType {
     }
 
     //添加public_onRecv和public_send函数是解决较低版本gcc一个lambad中不能访问protected或private方法的bug
-    //[AUTO-TRANSLATED:210f092e] Adding public_onRecv and public_send functions
-    // is to solve a bug in lower version gcc where a lambda cannot access
-    // protected or private methods
     inline void public_onRecv(const Buffer::Ptr &buf) {
         TcpClientType::onRecv(buf);
     }
@@ -210,8 +172,7 @@ class TcpClientWithSSL : public TcpClientType {
                 [this](const Buffer::Ptr &buf) { public_send(buf); });
 
             if (!isIP(_host.data())) {
-                //设置ssl域名  [AUTO-TRANSLATED:1286a860]
-                // Set ssl domain
+                //设置ssl域名
                 _ssl_box->setHost(_host.data());
             }
         }
@@ -219,10 +180,6 @@ class TcpClientWithSSL : public TcpClientType {
     }
     /**
      * 重置ssl, 主要为了解决一些302跳转时http与https的转换
-     * Reset ssl, mainly to solve some 302 redirects when switching between http
-     and https
-
-     * [AUTO-TRANSLATED:12ad26da]
      */
     void setDoNotUseSSL() { _ssl_box.reset(); }
 

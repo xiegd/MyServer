@@ -26,8 +26,7 @@ SessionHelper::SessionHelper(const std::weak_ptr<Server> &server,
     _server = server;
     _session = std::move(session);
     _cls = std::move(cls);
-    //记录session至全局的map，方便后面管理  [AUTO-TRANSLATED:f90fce35]
-    // Record the session in the global map for easy management later
+    //记录session至全局的map，方便后面管理
     _session_map = SessionMap::Instance().shared_from_this();
     _identifier = _session->getIdentifier();
     _session_map->add(_identifier, _session);
@@ -35,12 +34,10 @@ SessionHelper::SessionHelper(const std::weak_ptr<Server> &server,
 
 SessionHelper::~SessionHelper() {
     if (!_server.lock()) {
-        //务必通知Session已从TcpServer脱离  [AUTO-TRANSLATED:6f55a358]
-        // Must notify that the session has been detached from TcpServer
+        //务必通知Session已从TcpServer脱离
         _session->onError(SockException(Err_other, "Server shutdown"));
     }
-    //从全局map移除相关记录  [AUTO-TRANSLATED:f0b0b2ad]
-    // Remove the related record from the global map
+    //从全局map移除相关记录
     _session_map->del(_identifier);
 }
 
@@ -52,12 +49,13 @@ const std::string &SessionHelper::className() const { return _cls; }
 
 bool SessionMap::add(const string &tag, const Session::Ptr &session) {
     lock_guard<mutex> lck(_mtx_session);
+    // emplace 返回pair, first指向插入元素对应的迭代器，second为bool类型，表示插入是否成功
     return _map_session.emplace(tag, session).second;
 }
 
 bool SessionMap::del(const string &tag) {
     lock_guard<mutex> lck(_mtx_session);
-    return _map_session.erase(tag);
+    return _map_session.erase(tag);  // 使用key作为参数，删除对应的键值对，返回删除的元素数量
 }
 
 Session::Ptr SessionMap::get(const string &tag) {
@@ -75,7 +73,7 @@ void SessionMap::for_each_session(
     for (auto it = _map_session.begin(); it != _map_session.end();) {
         auto session = it->second.lock();
         if (!session) {
-            it = _map_session.erase(it);
+            it = _map_session.erase(it);  // 参数为迭代器版本，删除迭代器指向的元素，返回下一个元素的迭代器
             continue;
         }
         cb(it->first, session);

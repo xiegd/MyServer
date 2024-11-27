@@ -58,6 +58,7 @@ static SockException getSockErr(int sock, bool try_errno = true) {
 
 Socket::Ptr Socket::createSocket(const EventPoller::Ptr &poller_in,
                                  bool enable_mutex) {
+    // 如果poller_in为空，则从EventPollerPool中获取poller
     auto poller =
         poller_in ? poller_in : EventPollerPool::Instance().getPoller();
     std::weak_ptr<EventPoller> weak_poller = poller;
@@ -620,6 +621,7 @@ int Socket::onAccept(const SockNum::Ptr &sock, int event) noexcept {
     struct sockaddr_storage peer_addr;
     socklen_t addr_len = sizeof(peer_addr);
     while (true) {
+        // 如果事件包含读事件
         if (event & EventPoller::Event_Read) {
             do {
                 fd = (int)accept(sock->rawFd(), (struct sockaddr *)&peer_addr,
@@ -1143,6 +1145,7 @@ void SocketHelper::setOnCreateSocket(Socket::onCreateSocket cb) {
     }
 }
 
+// 设置创建socket时的回调函数
 Socket::Ptr SocketHelper::createSocket() { return _on_create_socket(_poller); }
 
 std::ostream &operator<<(std::ostream &ost, const SockException &err) {

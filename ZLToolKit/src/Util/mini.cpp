@@ -25,6 +25,7 @@ using namespace std;
 
 namespace toolkit {
 
+// 表示是一个Ini_basic的特化版本
 template <>
 mINI_basic<string, variant> &mINI_basic<string, variant>::Instance() {
     static mINI_basic<string, variant> instance;
@@ -34,8 +35,7 @@ mINI_basic<string, variant> &mINI_basic<string, variant>::Instance() {
 template <>
 bool variant::as<bool>() const {
     if (empty() || isdigit(front())) {
-        //数字开头  [AUTO-TRANSLATED:e4266329]
-        // Starts with a number
+        //数字开头
         return as_default<bool>();
     }
     if (strToLower(std::string(*this)) == "true") {
@@ -44,14 +44,13 @@ bool variant::as<bool>() const {
     if (strToLower(std::string(*this)) == "false") {
         return false;
     }
-    //未识别字符串  [AUTO-TRANSLATED:b8037f51]
-    // Unrecognized string
+    //未识别字符串  
     return as_default<bool>();
 }
 
 template <>
 uint8_t variant::as<uint8_t>() const {
-    return 0xFF & as_default<int>();
+    return 0xFF & as_default<int>();  // 超出范围截断
 }
 
 }  // namespace toolkit

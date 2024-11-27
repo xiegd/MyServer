@@ -231,8 +231,7 @@ vector<string> split(const string &s, const char *delim) {
         while (s.size() && map.at((unsigned char &)s.front())) s.erase(0, 1); \
     } while (0);
 
-//去除前后的空格、回车符、制表符  [AUTO-TRANSLATED:0b0a7fc7]
-// Remove leading and trailing spaces, carriage returns, and tabs
+//去除前后的空格、回车符、制表符  
 std::string &trim(std::string &s, const string &chars) {
     TRIM(s, chars);
     return s;

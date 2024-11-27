@@ -17,31 +17,25 @@ using namespace std;
 using namespace toolkit;
 
 int main(int argc, char *argv[]) {
-    //初始化设置日志  [AUTO-TRANSLATED:f8d72b7b]
-    // Initialize log settings
+    //初始化设置日志
     Logger::Instance().add(std::make_shared<ConsoleChannel>());
     Logger::Instance().setWriter(std::make_shared<AsyncLogWriter>());
 
-    //加载证书，证书包含公钥和私钥  [AUTO-TRANSLATED:fce78641]
-    // Load certificate, certificate contains public key and private key
+    //加载证书，证书包含公钥和私钥
     SSL_Initor::Instance().loadCertificate((exeDir() + "ssl.p12").data());
     SSL_Initor::Instance().trustCertificate((exeDir() + "ssl.p12").data());
     SSL_Initor::Instance().ignoreInvalidCertificate(false);
 
-    //定义客户端和服务端  [AUTO-TRANSLATED:d419f035]
-    // Define client and server
+    //定义客户端和服务端
     SSL_Box client(false), server(true);
 
-    //设置客户端解密输出回调  [AUTO-TRANSLATED:b98ceb19]
-    // Set client decryption output callback
+    //设置客户端解密输出回调
     client.setOnDecData([&](const Buffer::Ptr &buffer) {
-        //打印来自服务端数据解密后的明文  [AUTO-TRANSLATED:c672d9f5]
-        // Print plaintext from server after decryption
+        //打印来自服务端数据解密后的明文
         InfoL << "client recv:" << buffer->toString();
     });
 
-    //设置客户端加密输出回调  [AUTO-TRANSLATED:e69a01e4]
-    // Set client encryption output callback
+    //设置客户端加密输出回调
     client.setOnEncData([&](const Buffer::Ptr &buffer) {
         //把客户端加密后的密文发送给服务端  [AUTO-TRANSLATED:eb54076a]
         // Send encrypted ciphertext from client to server

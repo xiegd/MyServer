@@ -13,6 +13,8 @@
 #include "logger.h"
 #include "onceToken.h"
 
+#define ENABLE_OPENSSL 1
+
 #if defined(ENABLE_OPENSSL)
 #include <openssl/bio.h>
 #include <openssl/conf.h>
@@ -45,14 +47,12 @@ std::string SSLUtil::getLastError() {
 #if defined(ENABLE_OPENSSL)
 
 static int getCerType(BIO *bio, const char *passwd, X509 **x509, int type) {
-    //尝试pem格式  [AUTO-TRANSLATED:8debedc8]
-    // Try pem format
+    //尝试pem格式
     if (type == 1 || type == 0) {
         if (type == 0) {
             BIO_reset(bio);
         }
-        // 尝试PEM格式  [AUTO-TRANSLATED:311e0a11]
-        // Try PEM format
+        // 尝试PEM格式
         *x509 = PEM_read_bio_X509(bio, nullptr, nullptr, nullptr);
         if (*x509) {
             return 1;
@@ -63,8 +63,7 @@ static int getCerType(BIO *bio, const char *passwd, X509 **x509, int type) {
         if (type == 0) {
             BIO_reset(bio);
         }
-        //尝试DER格式  [AUTO-TRANSLATED:97ea1386]
-        // Try DER format
+        //尝试DER格式
         *x509 = d2i_X509_bio(bio, nullptr);
         if (*x509) {
             return 2;
@@ -75,8 +74,7 @@ static int getCerType(BIO *bio, const char *passwd, X509 **x509, int type) {
         if (type == 0) {
             BIO_reset(bio);
         }
-        //尝试p12格式  [AUTO-TRANSLATED:32331d1d]
-        // Try p12 format
+        //尝试p12格式
         PKCS12 *p12 = d2i_PKCS12_bio(bio, nullptr);
         if (p12) {
             EVP_PKEY *pkey = nullptr;
@@ -130,6 +128,8 @@ shared_ptr<EVP_PKEY> SSLUtil::loadPrivateKey(const string &file_path_or_data,
                                              const string &passwd,
                                              bool isFile) {
 #if defined(ENABLE_OPENSSL)
+    // 加载公钥， 根据文件路径或数据创建BIO对象
+    // data 方法获取到的是const char*
     BIO *bio = isFile ? BIO_new_file((char *)file_path_or_data.data(), "r")
                       : BIO_new_mem_buf((char *)file_path_or_data.data(),
                                         file_path_or_data.size());
@@ -138,7 +138,7 @@ shared_ptr<EVP_PKEY> SSLUtil::loadPrivateKey(const string &file_path_or_data,
               << " failed: " << getLastError();
         return nullptr;
     }
-
+    // 密码回调函数, 用于将用户数据中的密码复制到buf中
     pem_password_cb *cb = [](char *buf, int size, int rwflag,
                              void *userdata) -> int {
         const string *passwd = (const string *)userdata;
@@ -146,26 +146,24 @@ shared_ptr<EVP_PKEY> SSLUtil::loadPrivateKey(const string &file_path_or_data,
         memcpy(buf, passwd->data(), size);
         return size;
     };
-
+    // 使用onceToken管理BIO对象的生命周期, 析构时释放BIO对象
     onceToken token0(nullptr, [&]() { BIO_free(bio); });
 
-    //尝试pem格式  [AUTO-TRANSLATED:8debedc8]
-    // Try pem format
+    //尝试pem格式
     EVP_PKEY *evp_key =
         PEM_read_bio_PrivateKey(bio, nullptr, cb, (void *)&passwd);
     if (!evp_key) {
-        //尝试p12格式  [AUTO-TRANSLATED:32331d1d]
-        // Try p12 format
-        BIO_reset(bio);
+        //尝试p12格式
+        BIO_reset(bio); // 重置BIO对象, 以便重新读取数据, 因为BIO是一个流对象
         PKCS12 *p12 = d2i_PKCS12_bio(bio, nullptr);
         if (!p12) {
             return nullptr;
         }
         X509 *x509 = nullptr;
-        PKCS12_parse(p12, passwd.data(), &evp_key, &x509, nullptr);
+        PKCS12_parse(p12, passwd.data(), &evp_key, &x509, nullptr);  // 解析PKCS12结构体，提取私钥和证书
         PKCS12_free(p12);
         if (x509) {
-            X509_free(x509);
+            X509_free(x509);  // 释放证书对象
         }
         if (!evp_key) {
             return nullptr;
@@ -193,24 +191,18 @@ shared_ptr<SSL_CTX> SSLUtil::makeSSLContext(
     }
     int i = 0;
     for (auto &cer : cers) {
-        //加载公钥  [AUTO-TRANSLATED:d3cadbdf]
-        // Load public key
+        //加载公钥  
         if (i++ == 0) {
             // SSL_CTX_use_certificate内部会调用X509_up_ref,所以这里不用X509_dup
-            // [AUTO-TRANSLATED:610aca57] SSL_CTX_use_certificate internally
-            // calls X509_up_ref, so no need to use X509_dup here
             SSL_CTX_use_certificate(ctx, cer.get());
         } else {
-            //需要先拷贝X509对象，否则指针会失效  [AUTO-TRANSLATED:c6cb5ebf]
-            // Need to copy X509 object first, otherwise the pointer will be
-            // invalid
+            //需要先拷贝X509对象，否则指针会失效  
             SSL_CTX_add_extra_chain_cert(ctx, X509_dup(cer.get()));
         }
     }
 
     if (key) {
-        //提供了私钥  [AUTO-TRANSLATED:1b23bc8c]
-        // Provided private key
+        //提供了私钥  
         if (SSL_CTX_use_PrivateKey(ctx, key.get()) != 1) {
             WarnL << "SSL_CTX_use_PrivateKey failed: " << getLastError();
             SSL_CTX_free(ctx);
@@ -219,8 +211,7 @@ shared_ptr<SSL_CTX> SSLUtil::makeSSLContext(
     }
 
     if (key || checkKey) {
-        //加载私钥成功  [AUTO-TRANSLATED:80e96abb]
-        // Private key loaded successfully
+        // 验证私钥和证书是否匹配, 一台服务器可以多个证书以及与之匹配的私钥
         if (SSL_CTX_check_private_key(ctx) != 1) {
             WarnL << "SSL_CTX_check_private_key failed: " << getLastError();
             SSL_CTX_free(ctx);
@@ -228,8 +219,7 @@ shared_ptr<SSL_CTX> SSLUtil::makeSSLContext(
         }
     }
 
-    //公钥私钥匹配或者没有公私钥  [AUTO-TRANSLATED:b12ac3e6]
-    // Public and private key match or no public and private key
+    //公钥私钥匹配或者没有公私钥  
     return shared_ptr<SSL_CTX>(ctx, [](SSL_CTX *ptr) { SSL_CTX_free(ptr); });
 #else
     return nullptr;
@@ -253,7 +243,7 @@ bool SSLUtil::loadDefaultCAs(SSL_CTX *ctx) {
     if (!ctx) {
         return false;
     }
-
+    // 设置ctx的系统默认受信任证书颁发机构列表，用于验证对方证书, 设置默认验证路径成功返回true
     if (SSL_CTX_set_default_verify_paths(ctx) != 1) {
         WarnL << "SSL_CTX_set_default_verify_paths failed: " << getLastError();
         return false;
@@ -266,7 +256,7 @@ bool SSLUtil::loadDefaultCAs(SSL_CTX *ctx) {
 
 bool SSLUtil::trustCertificate(SSL_CTX *ctx, X509 *cer) {
 #if defined(ENABLE_OPENSSL)
-    X509_STORE *store = SSL_CTX_get_cert_store(ctx);
+    X509_STORE *store = SSL_CTX_get_cert_store(ctx);  // 获取与ctx相关联的证书的结构体
     if (store && cer) {
         if (X509_STORE_add_cert(store, cer) != 1) {
             WarnL << "X509_STORE_add_cert failed: " << getLastError();
@@ -278,30 +268,32 @@ bool SSLUtil::trustCertificate(SSL_CTX *ctx, X509 *cer) {
     return false;
 }
 
+// 验证给定的证书是否有效
 bool SSLUtil::verifyX509(X509 *cer, ...) {
 #if defined(ENABLE_OPENSSL)
-    va_list args;
-    va_start(args, cer);
+    va_list args;  // 用于接收可变参数列表
+    va_start(args, cer);  // 初始化可变参数列表
     X509_STORE *store = X509_STORE_new();
     do {
         X509 *ca;
+        // 从可变参数列表中获取一个X509对象
         if ((ca = va_arg(args, X509 *)) == nullptr) {
             break;
         }
-        X509_STORE_add_cert(store, ca);
+        X509_STORE_add_cert(store, ca);  // 将CA证书添加到store中
     } while (true);
     va_end(args);
 
-    X509_STORE_CTX *store_ctx = X509_STORE_CTX_new();
-    X509_STORE_CTX_init(store_ctx, store, cer, nullptr);
-    auto ret = X509_verify_cert(store_ctx);
+    X509_STORE_CTX *store_ctx = X509_STORE_CTX_new();  // 创建一个X509_STORE_CTX对象
+    X509_STORE_CTX_init(store_ctx, store, cer, nullptr);  // 初始化X509_STORE_CTX对象
+    auto ret = X509_verify_cert(store_ctx);  // 验证证书是否可信
     if (ret != 1) {
         int depth = X509_STORE_CTX_get_error_depth(store_ctx);
         int err = X509_STORE_CTX_get_error(store_ctx);
         WarnL << "X509_verify_cert failed, depth: " << depth
               << ", err: " << X509_verify_cert_error_string(err);
     }
-
+    // 释放X509_STORE_CTX对象和X509_STORE对象
     X509_STORE_CTX_free(store_ctx);
     X509_STORE_free(store);
     return ret == 1;
@@ -334,6 +326,10 @@ RSA *EVP_PKEY_get0_RSA(EVP_PKEY *pkey) {
 #endif  // EVP_F_EVP_PKEY_GET0_RSA
 #endif  // ENABLE_OPENSSL
 
+// crypt: encryption or decryption， 加密或解密
+// 下面两个方法分别实现公钥和私钥的加密/解密，非对称加密算法
+// 因为公钥加密的只有私钥才能解密
+// 使用公钥进行加密/解密， 只能使用私钥对加密后的数据进行解密
 string SSLUtil::cryptWithRsaPublicKey(X509 *cer, const string &in_str,
                                       bool enc_or_dec) {
 #if defined(ENABLE_OPENSSL)
@@ -370,6 +366,7 @@ string SSLUtil::cryptWithRsaPublicKey(X509 *cer, const string &in_str,
 #endif  // defined(ENABLE_OPENSSL)
 }
 
+// 使用私钥进行加密/解密
 string SSLUtil::cryptWithRsaPrivateKey(EVP_PKEY *private_key,
                                        const string &in_str, bool enc_or_dec) {
 #if defined(ENABLE_OPENSSL)
@@ -406,8 +403,7 @@ string SSLUtil::getServerName(X509 *cer) {
     if (!cer) {
         return "";
     }
-    //获取证书里的域名  [AUTO-TRANSLATED:97830946]
-    // Get domain name from certificate
+    //获取证书里的域名  
     X509_NAME *name = X509_get_subject_name(cer);
     char ret[256] = {0};
     X509_NAME_get_text_by_NID(name, NID_commonName, ret, sizeof(ret));

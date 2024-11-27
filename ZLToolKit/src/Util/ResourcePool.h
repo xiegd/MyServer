@@ -63,6 +63,8 @@ class shared_ptr_imp : public std::shared_ptr<C> {
      * @brief 设置是否退出资源池循环
      * 
      * @param flag 如果为 true，则退出资源池循环；否则继续使用资源池
+     * 如果_quit为false, 则在调用shared_ptr的自定义的deleter时，会调用资源池的回收函数
+     * 而不是删除对象
      */
     void quit(bool flag = true) {
         if (_quit) {
@@ -130,7 +132,7 @@ class ResourcePool_l : public std::enable_shared_from_this<ResourcePool_l<C>> {
      */
     void setSize(size_t size) {
         _pool_size = size;
-        _objs.reserve(size);
+        _objs.reserve(size);  //  分配内存：
     }
 
     /**
@@ -191,7 +193,7 @@ class ResourcePool_l : public std::enable_shared_from_this<ResourcePool_l<C>> {
      */
     C *getPtr() {
         C *ptr;
-        auto is_busy = _busy.test_and_set();
+        auto is_busy = _busy.test_and_set();  // 将_busy设置为true, 返回_busy的旧值
         if (!is_busy) {
             // 获取到锁
             if (_objs.size() == 0) {
@@ -219,7 +221,7 @@ class ResourcePool_l : public std::enable_shared_from_this<ResourcePool_l<C>> {
     size_t _pool_size = 8; // 池的最大容量
     std::vector<C *> _objs; // 存储可用对象的向量
     std::function<C *(void)> _alloc; // 分配器函数
-    std::atomic_flag _busy{false}; // 标记池是否正在被访问
+    std::atomic_flag _busy{false}; // 标记池是否正在被访问, 原子类型的bool， 必须初始化为false
     std::weak_ptr<ResourcePool_l> _weak_self; // 弱引用自身
 };
 

@@ -21,11 +21,12 @@
 #include "logger.h"
 #include "util.h"
 
-typedef struct x509_st X509;
-typedef struct evp_pkey_st EVP_PKEY;
-typedef struct ssl_ctx_st SSL_CTX;
-typedef struct ssl_st SSL;
-typedef struct bio_st BIO;
+// openssl 库中的核心数据结构
+typedef struct x509_st X509;  // 数字证书
+typedef struct evp_pkey_st EVP_PKEY;  // 密钥
+typedef struct ssl_ctx_st SSL_CTX;  // SSL上下文
+typedef struct ssl_st SSL;  // 表示一个SSL连接
+typedef struct bio_st BIO;  // BIO，I/O抽象层
 
 namespace toolkit {
 
