@@ -1,5 +1,5 @@
 ﻿/*
- * EventPoller: 时间轮询器
+ * EventPoller: 事件轮询器
  *
  * 
  *

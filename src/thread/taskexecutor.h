@@ -157,7 +157,7 @@ protected:
     size_t addPoller(const std::string& name, size_t size, Thread_Priority priority,
         bool register_thread, bool enable_cpu_affinity = true);
 protected:
-    size_t thread_idx_ = 0;  // 跟踪当前选择的线程(TaskExector)索引，是上一次选出的负载最小的线程
+    size_t thread_idx_ = 0;  // 跟踪当前选择的线程(TaskExecutor)索引，是上一次选出的负载最小的线程
     std::vector<TaskExecutor::Ptr> threads_;
 };
 }  // namespace xkernel

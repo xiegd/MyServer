@@ -18,7 +18,7 @@
 #include <cstring>
 
 #include "utility.h"
-#include "ResourcePool.h"
+#include "resourcepool.h"
 
 namespace xkernel {
 // 用于检查类型是否为指针的模板结构体

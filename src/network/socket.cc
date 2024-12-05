@@ -11,9 +11,32 @@ namespace xkernel {
 
 STATISTIC_IMPL(Socket)
 
-static SockException toSockException(int error) {}
+static SockException toSockException(int error) {
+    switch (error) {
+        case 0:
+        case UV_EAGAIN:
+            return SockException(ErrorCode::Success, "success");
+        case UV_ECONNREFUSED:
+            return SockException(ErrorCode::Refused, uv_strerror(error));
+        case UV_ETIMEDOUT:
+            return SockException(ErrorCode::Timeout, uv_strerror(error));
+        default:
+            return SockException(ErrorCode::Other, uv_strerror(error));
+    }
+}
 
-static SockException getSockErr(int sock, bool try_errno = true) {}
+static SockException getSockErr(int sock, bool try_errno = true) {
+    int error = 0, len = sizeof(int);
+    getsockopt(sock, SOL_SOCKET, SO_ERROR, (char*)&error, (socklen_t*)&len);
+    if (error == 0) {
+        if (try_errno) {
+            error = get_uv_error(true);
+        } else {
+            error = uv_translate_posix_error(error);
+        }
+    }
+    return toSockException(error);
+}
 
 
 //////////////////////////////// SockException /////////////////////////////

@@ -310,11 +310,11 @@ bool EventPoller::isCurrentThread() {
 
 // 处理管道事件, 在管道事件的回调函数中调用
 inline void EventPoller::onPipeEvent(bool flush) {
-    char buf[1024];
+    char buf[1024];  // 管道缓冲区, 固定大小在函数返回时自动释放
     int err = 0;
     if (!flush) {
         for (;;) {
-            // 读取数据是为了情况管道，通知事件循环有新任务，数据不重要
+            // 读取数据是为了清空管道，通知事件循环有新任务，数据不重要
             // 是为了触发事件，不清空管道会持续触发读事件
             if ((err = _pipe.read(buf, sizeof(buf))) > 0) {
                 // 读到管道数据,继续读,直到读空为止  
@@ -402,6 +402,7 @@ void EventPoller::runLoop(bool blocked, bool ref_self) {
             startSleep();  // 统计上一段执行任务的时间 
             // 使用epoll_wait等待事件发生，超时时间由minDelay决定, 
             // 如果minDelay为0，则不设置超时时间，一直等待事件发生
+            // epoll_wait返回值为发生的事件数量, 并将发生的事件写入events数组中
             int ret = epoll_wait(_event_fd, events, EPOLL_SIZE,
                                  minDelay ? minDelay : -1);
             sleepWakeUp(); // 统计sleep时间 
@@ -411,7 +412,7 @@ void EventPoller::runLoop(bool blocked, bool ref_self) {
             }
 
             _event_cache_expired.clear();  // 清除事件缓存
-
+            // 遍历发生的事件, 并执行事件回调
             for (int i = 0; i < ret; ++i) {
                 struct epoll_event &ev = events[i];
                 int fd = ev.data.fd;

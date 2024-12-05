@@ -5,8 +5,9 @@
 /ZLToolKit/lib
 /test/build
 /test/unittest/build
-/.vscode
 /src/main.cc
 /test/unit/build
 /sources
 /workflow
+/bin
+/test/test/build

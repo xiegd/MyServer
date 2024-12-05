@@ -25,6 +25,7 @@ using namespace toolkit;
  */
 int main() {
     static bool exit_flag = false;
+    // 设置信号处理函数，处理SIGINT信号，通常是ctrl+c发送的
     signal(SIGINT, [](int) { exit_flag = true; });
     //设置日志
     Logger::Instance().add(std::make_shared<ConsoleChannel>());

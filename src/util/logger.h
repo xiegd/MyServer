@@ -162,7 +162,7 @@ public:
     LogChannel(const std::string &name, LogLevel level = LogLevel::LTrace);
     virtual ~LogChannel();
 
-    virtual void write(const Logger &logger, const LogContextPtr &ctx) = 0;
+    virtual void write(const Logger &logger, const LogContextPtr &ctx, const std::string& name) = 0;
     const std::string &name() const;
     void setLevel(LogLevel level);
     static std::string printTime(const timeval &tv);
@@ -170,8 +170,8 @@ public:
 protected:
     // 打印日志至输出流
     virtual void format(const Logger &logger, std::ostream &ost,
-                        const LogContextPtr &ctx, bool enable_color = true,
-                        bool enable_detail = true);
+                        const LogContextPtr &ctx, const std::string& channel, 
+                        bool enable_color = true, bool enable_detail = true);
 
 protected:
     std::string _name;
@@ -191,7 +191,7 @@ public:
     EventChannel(const std::string &name = "EventChannel", LogLevel level = LogLevel::LTrace);
     ~EventChannel() override = default;
 
-    void write(const Logger &logger, const LogContextPtr &ctx) override;
+    void write(const Logger &logger, const LogContextPtr &ctx, const std::string& name) override;
 };
 
 
@@ -201,7 +201,7 @@ public:
     ConsoleChannel(const std::string &name = "ConsoleChannel", LogLevel level = LogLevel::LTrace);
     ~ConsoleChannel() override = default;
 
-    void write(const Logger &logger, const LogContextPtr &logContext) override;
+    void write(const Logger &logger, const LogContextPtr &logContext, const std::string& name) override;
 };
 
 // 输出日志到syslog, 将日志发送到系统的syslog
@@ -210,7 +210,7 @@ public:
     SysLogChannel(const std::string &name = "SysLogChannel", LogLevel level = LogLevel::LTrace);
     ~SysLogChannel() override = default;
 
-    void write(const Logger &logger, const LogContextPtr &logContext) override;
+    void write(const Logger &logger, const LogContextPtr &logContext, const std::string& name) override;
 };
 
 // 输出日志至文件
@@ -221,7 +221,7 @@ public:
                     LogLevel level = LogLevel::LTrace);
     ~FileChannelBase() override;
 
-    void write(const Logger &logger, const LogContextPtr &ctx) override;
+    void write(const Logger &logger, const LogContextPtr &ctx, const std::string& name) override;
     bool setPath(const std::string &path);
     const std::string &path() const;
 
@@ -249,7 +249,7 @@ public:
                 LogLevel level = LogLevel::LTrace);
     ~FileChannel() override = default;
 
-    void write(const Logger &logger, const LogContextPtr &ctx) override;  // 写日志(会触发新建/删除日志)
+    void write(const Logger &logger, const LogContextPtr &ctx, const std::string& name) override;  // 写日志(会触发新建/删除日志)
     void setMaxDay(size_t max_day);  // 设置日志最大保存天数
     void setFileMaxSize(size_t max_size);  // 设置日志切片文件最大大小
     void setFileMaxCount(size_t max_count);  // 设置日志切片文件最大个数

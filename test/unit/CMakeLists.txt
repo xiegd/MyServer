@@ -23,6 +23,8 @@ set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 # 实际的下载和配置FetchContent_Declare的内容，如果gtest没有下载则进行下载
 FetchContent_MakeAvailable(googletest)
 
+find_package(OpenSSL REQUIRED)
+
 set(OUTPUT_DIR ${CMAKE_SOURCE_DIR}/bin)
 set(SOURCE_DIR ${CMAKE_SOURCE_DIR}/../../src)
 set(HEADER_DIR ${CMAKE_SOURCE_DIR})
@@ -46,18 +48,18 @@ file(GLOB NETWORK_HEAD ${SOURCE_DIR}/network/*.h)
 
 message(STATUS "UTIL_SRCS: ${UTIL_SRCS}")
 
-add_executable(eventpoller_test eventpoller_test.cc 
+add_executable(tcpserver_test tcpserver_test.cc 
               ${UTIL_SRCS}
               ${POLLE_SRCS}
               ${THREAD_SRCS}
               ${NETWORK_SRCS}
               )
 
-target_include_directories(eventpoller_test 
+target_include_directories(tcpserver_test 
   PRIVATE
     ${INCLUDE_DIRS}
 )
 
-target_link_libraries(eventpoller_test gtest_main)
+target_link_libraries(tcpserver_test gtest_main OpenSSL::Crypto OpenSSL::SSL)
 
-set_target_properties(eventpoller_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_DIR}) 
+set_target_properties(tcpserver_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_DIR}) 

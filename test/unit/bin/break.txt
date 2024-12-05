@@ -1,0 +1,7 @@
+break tcpserver_test.cc:34
+  condition $bpnum i > 10
+break xkernel::ThreadPool::async
+disable $bpnum
+break xkernel::ThreadPool::async
+break xkernel::ThreadPool::async
+watch main()::task_second

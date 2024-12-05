@@ -85,10 +85,10 @@ void Logger::setLevel(LogLevel level) {
 
 void Logger::writeChannels_l(const LogContextPtr &ctx) {
     if (_channels.empty()) {
-        _default_channel->write(*this, ctx);
+        _default_channel->write(*this, ctx, "default");
     } else {
         for (auto &chn : _channels) {
-            chn.second->write(*this, ctx);
+            chn.second->write(*this, ctx, chn.first);
         }
     }
     _last_log = ctx;
@@ -229,7 +229,7 @@ const std::string EventChannel::kBroadcastLogEvent = "kBroadcastLogEvent";
 
 EventChannel::EventChannel(const std::string &name, LogLevel level) : LogChannel(name, level) {}
 
-void EventChannel::write(const Logger &logger, const LogContextPtr &ctx) {
+void EventChannel::write(const Logger &logger, const LogContextPtr &ctx, const std::string& channel) {
     if (_level > ctx->_level) {
         return;
     }
@@ -245,18 +245,18 @@ const std::string &EventChannel::getBroadcastLogEventName() {
 
 ConsoleChannel::ConsoleChannel(const std::string &name, LogLevel level) : LogChannel(name, level) {}
 
-void ConsoleChannel::write(const Logger &logger, const LogContextPtr &ctx) {
+void ConsoleChannel::write(const Logger &logger, const LogContextPtr &ctx, const std::string& channel) {
     if (_level > ctx->_level) {
         return;
     }
-    format(logger, std::cout, ctx);
+    format(logger, std::cout, ctx, channel);
 }
 
 ///////////////////SysLogChannel///////////////////
 
 SysLogChannel::SysLogChannel(const std::string &name, LogLevel level) : LogChannel(name, level) {}
 
-void SysLogChannel::write(const Logger &logger, const LogContextPtr &ctx) {
+void SysLogChannel::write(const Logger &logger, const LogContextPtr &ctx, const std::string& channel) {
     if (_level > ctx->_level) {
         return;
     }
@@ -300,8 +300,8 @@ std::string LogChannel::printTime(const timeval &tv) {
 }
 
 void LogChannel::format(const Logger &logger, std::ostream &ost,
-                        const LogContextPtr &ctx, bool enable_color,
-                        bool enable_detail) {
+                        const LogContextPtr &ctx, const std::string& channel,
+                        bool enable_color, bool enable_detail) {
     if (!enable_detail && ctx->str().empty()) {
         // 没有任何信息打印
         return;
@@ -312,14 +312,14 @@ void LogChannel::format(const Logger &logger, std::ostream &ost,
         ost << LOG_CONST_TABLE[static_cast<int>(ctx->_level)][1];
     }
 
-    // print log time and level
-    ost << printTime(ctx->_tv) << " " << LOG_CONST_TABLE[static_cast<int>(ctx->_level)][2] << " ";
+    // print log time , channel name and level
+    ost << printTime(ctx->_tv) << " " << channel << " " << LOG_CONST_TABLE[static_cast<int>(ctx->_level)][2] << " ";
 
     if (enable_detail) {
         // tag or process name
         ost << "[" << (!ctx->_flag.empty() ? ctx->_flag : logger.getName())
             << "] ";
-        // pid and thread_name
+        // pid(process id) and thread_name
         ost << "[" << getpid() << "-" << ctx->_thread_name << "] ";
         // source file location
         ost << ctx->_file << ":" << ctx->_line << " " << ctx->_function
@@ -351,7 +351,7 @@ FileChannelBase::FileChannelBase(const std::string &name, const std::string &pat
 
 FileChannelBase::~FileChannelBase() { close(); }
 
-void FileChannelBase::write(const Logger &logger, const std::shared_ptr<LogContext> &ctx) {
+void FileChannelBase::write(const Logger &logger, const std::shared_ptr<LogContext> &ctx, const std::string& channel) {
     if (_level > ctx->_level) {
         return;
     }
@@ -359,7 +359,7 @@ void FileChannelBase::write(const Logger &logger, const std::shared_ptr<LogConte
         open();
     }
     //打印至文件，不启用颜色
-    format(logger, _fstream, ctx, false);
+    format(logger, _fstream, ctx, channel, false);
 }
 
 bool FileChannelBase::setPath(const std::string &path) {
@@ -456,7 +456,7 @@ FileChannel::FileChannel(const std::string &name, const std::string &dir, LogLev
     }
 }
 
-void FileChannel::write(const Logger &logger, const LogContextPtr &ctx) {
+void FileChannel::write(const Logger &logger, const LogContextPtr &ctx, const std::string& channel) {
     time_t second = ctx->_tv.tv_sec;  // GMT UNIX时间戳
     auto day = getDay(second);  // 这条日志所在第几天
     if ((int64_t)day != _last_day) {
@@ -471,7 +471,7 @@ void FileChannel::write(const Logger &logger, const LogContextPtr &ctx) {
 
     //写日志
     if (_can_write) {
-        FileChannelBase::write(logger, ctx);
+        FileChannelBase::write(logger, ctx, channel);
     }
 }
 

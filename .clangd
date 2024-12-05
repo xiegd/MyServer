@@ -1,0 +1,6 @@
+CompileFlags:
+  Add: 
+    - "-I${workspaceFolder}/src/util"
+    - "-I${workspaceFolder}/src/network"
+    - "-I${workspaceFolder}/src/poller"
+    - "-I${workspaceFolder}/src/thread" 

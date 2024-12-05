@@ -166,23 +166,23 @@ void TaskExecutorGetterImpl::forEach(const std::function<void(const TaskExecutor
 
 size_t TaskExecutorGetterImpl::addPoller(const std::string& name, size_t size, 
     Thread_Priority priority, bool register_thread, bool enable_cpu_affinity) {
-        auto cpus = std::thread::hardware_concurrency();
-        size = size > 0 ? size : cpus;
-        for (size_t i = 0; i < size; ++i) {
-            auto full_name = name + "_" + std::to_string(i);
-            auto cpu_index = i % cpus;
-            EventPoller::Ptr poller(new EventPoller(full_name));
-            poller->runLoop(false, register_thread);
-            poller->async([cpu_index, full_name, priority, enable_cpu_affinity]() {
-                ThreadPool::setPriority(priority);
-                ThreadUtil::setThreadName(full_name.data());
-                if (enable_cpu_affinity) {
-                    ThreadUtil::setThreadAffinity(cpu_index);
-                }
-            });
-            threads_.emplace_back(std::move(poller));
-        }
-        return size;
+    auto cpus = std::thread::hardware_concurrency();
+    size = size > 0 ? size : cpus;
+    for (size_t i = 0; i < size; ++i) {
+        auto full_name = name + "_" + std::to_string(i);
+        auto cpu_index = i % cpus;
+        EventPoller::Ptr poller(new EventPoller(full_name));
+        poller->runLoop(false, register_thread);
+        poller->async([cpu_index, full_name, priority, enable_cpu_affinity]() {
+            ThreadPool::setPriority(priority);
+            ThreadUtil::setThreadName(full_name.data());
+            if (enable_cpu_affinity) {
+                ThreadUtil::setThreadAffinity(cpu_index);
+            }
+        });
+        threads_.emplace_back(std::move(poller));
     }
+    return size;
+}
 
 }  // namespace xkernel
