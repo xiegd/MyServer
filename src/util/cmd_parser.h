@@ -116,6 +116,7 @@ public:
 class CmdClear : public Cmd {
 public:
     CmdClear();
+    ~CmdClear() override = default;
     const char* description() const override;
 
 private:

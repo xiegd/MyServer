@@ -385,6 +385,8 @@ CmdClear::CmdClear() {
     );
 }
 
+const char* CmdClear::description() const { return "clear screen"; }
+
 void CmdClear::clear(const std::shared_ptr<std::ostream>& stream) {
     (*stream) << "\x1b[2J\x1b[H";
     stream->flush();
