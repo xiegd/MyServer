@@ -36,7 +36,7 @@ private:
 
 private:
     mutable std::string id_;
-    std::string net_adapter_;
+    std::string net_adapter_ = "::";
     std::shared_ptr<Timer> timer_;
     ObjectCounter<TcpClient> counter_;
 };

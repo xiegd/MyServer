@@ -8,7 +8,7 @@
 #include "utility.h"
 
 
-#define ENABLE_OPENSSL 1
+// #define ENABLE_OPENSSL 1
 
 #if defined(ENABLE_OPENSSL)
 #include <openssl/bio.h>

@@ -213,6 +213,12 @@ public:
     uint16_t getPeerPort() override;
     std::string getIdentifier() const override;  // 获取socket对象的内存地址
 
+    // 测试Debug内存异常问题
+    void getBufferSize() {
+        DebugL << "buffer size: " << this->send_buf_waiting_.size();
+        DebugL << "buffer size: " << this->send_buf_sending_.size();
+    }
+
 private:
     Socket(EventPoller::Ptr poller, bool enable_mutex = true);
     void setSock(SockNum::Ptr sock);  // 设置sock_fd_和local_addr_、peer_addr_
@@ -287,7 +293,7 @@ public:
     }
 };
 
-// Socket对象的包装类
+// Socket对象的包装类, 继承了多个纯虚类, 每个纯虚类包含了一类的接口
 class SocketHelper : public SockSender,
                      public SockInfo,
                      public TaskExecutorInterface,
@@ -321,6 +327,11 @@ public:
     ssize_t send(Buffer::Ptr buf) override;
     void shutdown(const SockException& ex = SockException(ErrorCode::Shutdown, "self shutdown")) override;
     void safeShutdown(const SockException& ex = SockException(ErrorCode::Shutdown, "self shutdown"));
+
+    // 调试内存异常问题
+    void getBufferSize() {
+        this->sock_->getBufferSize();
+    }
 
     virtual void onRecv(const Buffer::Ptr& buf) = 0;
     virtual void onErr(const SockException& err) = 0;

@@ -44,11 +44,15 @@ bool SessionMap::add(const std::string& tag, const Session::Ptr& session) {
 
 SessionHelper::SessionHelper(const std::weak_ptr<Server>& server, 
                              Session::Ptr session, const std::string cls) {
+    InfoL << "enter SessionHelper construtor!";
     server_ = server;
     session_ = std::move(session);
     cls_ = std::move(cls);
+    session_map_ = SessionMap::Instance().shared_from_this();
     identifier_ = session_->getIdentifier();
+    InfoL << "before add!";
     session_map_->add(identifier_, session_);
+    InfoL << "leave SessionHelper construtor!";
 }
 
 SessionHelper::~SessionHelper() {

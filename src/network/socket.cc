@@ -112,6 +112,13 @@ std::string SockInfo::getIdentifier() const { return ""; }
 
 //////////////////////////////// Socket //////////////////////////////////////
 
+/*
+    brief: 创建socket实例(静态方法)，如果传入了poller_in，则使用传入的poller_in，
+        否则在EventPollerPool中选择负载最小的poller
+    param:
+        poller_in: 事件轮询器, 默认为nullptr
+        enable_mutex: 是否启用互斥锁, 默认为true
+*/
 Socket::Ptr Socket::createSocket(const EventPoller::Ptr& poller_in, bool enable_mutex) {
     auto poller = poller_in ? poller_in : EventPollerPool::Instance().getPoller();
     std::weak_ptr<EventPoller> weak_poller = poller;
@@ -176,6 +183,12 @@ void Socket::setOnErr(onErrCb cb) {
     }
 }
 
+/*
+    brief: 设置accept事件回调, 对应在TcpServer::setupEvent()里设置cb，然后调用这个方法
+        将新连接分发到对应的线程处理
+    param:
+        cb: accept事件回调函数
+*/
 void Socket::setOnAccept(onAcceptCb cb) {
     std::lock_guard<decltype(mtx_event_)> lock(mtx_event_);
     if (cb) {
@@ -196,6 +209,12 @@ void Socket::setOnFlush(onFlush cb) {
     }
 }
 
+/*
+    brief: 设置before accept事件回调, 即TcpServer::onBeforeAcceptConnection回调
+        在accept前调用，创建socket
+    param:
+        cb: before accept事件回调函数
+*/
 void Socket::setOnBeforeAccept(onCreateSocket cb) {
     std::lock_guard<decltype(mtx_event_)> lock(mtx_event_);
     if (cb) {
@@ -212,6 +231,9 @@ void Socket::setOnSendResult(onSendResult cb) {
     send_result_ = std::move(cb);
 }
 
+/*
+    主动连接
+*/
 void Socket::connect(const std::string& url, uint16_t port, const onErrCb& con_cb_in, 
             float timeout_sec, const std::string& local_ip, uint16_t local_port) {
     std::weak_ptr<Socket> weak_self = shared_from_this();
@@ -227,7 +249,6 @@ void Socket::connect_l(const std::string& url, uint16_t port,
                        const std::string& local_ip, uint16_t local_port) {
     closeSock();  // 关闭当前socket
     std::weak_ptr<Socket> weak_self = shared_from_this();
-
     // 连接回调, 外层回调，负责进行清理和调用外部连接回调函数
     auto con_cb = [con_cb_in, weak_self](const SockException& err) {
         auto strong_self = weak_self.lock();
@@ -250,6 +271,7 @@ void Socket::connect_l(const std::string& url, uint16_t port,
                 con_cb(SockException(ErrorCode::Dns, get_uv_errmsg(true)));
                 return ;
             }
+            // 添加对fd的事件监听，对应事件发生时调用回调执行连接时的回调
             int result = strong_self->poller_->addEvent(
                 sock->rawFd(), EventPoller::Poll_Event::Write_Event | EventPoller::Poll_Event::Error_Event,
                 [weak_self, sock, con_cb](EventPoller::Poll_Event event) {
@@ -296,7 +318,9 @@ void Socket::connect_l(const std::string& url, uint16_t port,
 
 void Socket::onConnected(const SockNum::Ptr& sock, const onErrCb& cb) {
     auto err = getSockErr(sock->rawFd(), false);
-    if (err) {
+    ///
+    // TraceL << "err: " << err;
+    if (err.getErrCode() != ErrorCode::Success) {
         cb(err);
         return ;
     }
@@ -316,10 +340,14 @@ void Socket::onConnected(const SockNum::Ptr& sock, const onErrCb& cb) {
     cb(err);
 }
 
+/*
+    brief: 创建socket后，根据socket类型，注册对应的事件监听, 设置相应的回调
+*/
 bool Socket::attachEvent(const SockNum::Ptr& sock) {
     std::weak_ptr<Socket> weak_self = shared_from_this();
     // tcp server
     if (sock->type() == SockNum::SockType::TCP_Server) {
+        // 添加对fd的监听, 监听可读事件时，调用onAccept回调中accept()返回的socketfd进行实际的数据收发
         auto result = poller_->addEvent(
             sock->rawFd(), 
             EventPoller::Poll_Event::Read_Event | EventPoller::Poll_Event::Error_Event,
@@ -373,6 +401,7 @@ ssize_t Socket::onRead(const SockNum::Ptr& sock, const SocketRecvBuffer::Ptr& bu
         if (nread == -1) {
             auto err = get_uv_error(true);
             if (err != UV_EAGAIN) {
+                // EAGAIN: 非阻塞模式下，没有数据可读
                 if (sock->type() == SockNum::SockType::TCP) {
                     emitErr(toSockException(err));
                 } else {
@@ -446,6 +475,7 @@ bool Socket::fromSock(int fd, SockNum::SockType type) {
 }
 
 bool Socket::fromSock_l(SockNum::Ptr sock) {
+    // attachEvent() 根据socket类型，向poller添加对应的事件监听, 并设置相应的回调
     if (!attachEvent(sock)) {
         return false;
     }
@@ -453,9 +483,13 @@ bool Socket::fromSock_l(SockNum::Ptr sock) {
     return true;
 }
 
+/*
+    brief: 从另一个Socket复制， 让一个Socket被多个poller监听
+    主要是创建主server时，让主server创建的socket同时被EventPollerPool中的所有poller监听
+*/
 bool Socket::cloneSocket(const Socket& other) {
     closeSock();
-    SockNum::Ptr sock = other.sock_fd_->sockNum();
+    SockNum::Ptr sock;
     {
         std::lock_guard<decltype(other.mtx_sock_fd_)> lock(other.mtx_sock_fd_);
         if (!other.sock_fd_) {
@@ -658,86 +692,90 @@ int Socket::onAccept(const SockNum::Ptr& sock, EventPoller::Poll_Event event) no
     struct sockaddr_storage peer_addr;
     socklen_t addr_len = sizeof peer_addr;
     while (true) {
+        // 处理多个连接请求
         if (!(event & EventPoller::Poll_Event::Read_Event)) {
             do {
+                // accept返回的fd用于实际的数据收发
                 fd = accept(sock->rawFd(), reinterpret_cast<struct sockaddr*>(&peer_addr), &addr_len);
             } while ( -1 == fd && UV_EINTR == get_uv_error(true));
-        }
-        // accept失败
-        if (fd == -1) {
-            int err = get_uv_error(true);
-            if (err == UV_EAGAIN) {
-                return 0;  // 没有新连接
-            }
-            auto ex = toSockException(err);
-            ErrorL << "Accept socket failed: " << ex.what();
-            // 可能打开的文件描述符太多了:UV_EMFILE/UV_ENFILE
-            // 边缘触发，还需要手动再触发accept事件,
-            std::weak_ptr<Socket> weak_self = shared_from_this();
-            poller_->doDelayTask(100, [weak_self, sock]() {
-                if (auto strong_self = weak_self.lock()) {
-                    strong_self->onAccept(sock, EventPoller::Poll_Event::Read_Event);
+        
+            // accept失败
+            if (fd == -1) {
+                int err = get_uv_error(true);
+                if (err == UV_EAGAIN) {
+                    return 0;  // 没有新连接, 直接return退出循环
                 }
-                return 0;
+                auto ex = toSockException(err);
+                ErrorL << "Accept socket failed: " << ex.what();
+                // 可能打开的文件描述符太多了:UV_EMFILE/UV_ENFILE
+                // 边缘触发，还需要手动再触发accept事件,
+                std::weak_ptr<Socket> weak_self = shared_from_this();
+                poller_->doDelayTask(100, [weak_self, sock]() {
+                    if (auto strong_self = weak_self.lock()) {
+                        strong_self->onAccept(sock, EventPoller::Poll_Event::Read_Event);
+                    }
+                    return 0;
+                });
+                return -1;
+            }
+
+            SockUtil::setNoSigpipe(fd);
+            SockUtil::setNoBlocked(fd);
+            SockUtil::setNoDelay(fd);
+            SockUtil::setSendBuf(fd);
+            SockUtil::setRecvBuf(fd);
+            SockUtil::setCloseWait(fd);
+            SockUtil::setCloExec(fd);
+
+            Socket::Ptr peer_sock;
+            try {
+                std::lock_guard<decltype(mtx_event_)> lock(mtx_event_);
+                // multi_poller_时从EventPollerPool中选择负载最小的poller，创建socket并使用选择的poller监听
+                peer_sock = on_before_accept_(poller_);  // 非multi_poller_时，使用当前poller
+            } catch (std::exception& ex) {
+                ErrorL << "Exception occurred when emit on_before_accept: " << ex.what();
+                close(fd);
+                continue;
+            }
+
+            if (!peer_sock) {
+                // 子Socket共用父Socket的poll线程并且关闭互斥锁
+                peer_sock = Socket::createSocket(poller_, false);
+            }
+
+            auto sock = std::make_shared<SockNum>(fd, SockNum::SockType::TCP);  // 创建sock封装fd
+            peer_sock->setSock(sock);  // 将fd关联到Socket实例
+            memcpy(&peer_sock->peer_addr_, &peer_addr, addr_len);
+
+            std::shared_ptr<void> completed(nullptr, [peer_sock, sock](void*) {
+                try {
+                    if (!peer_sock->attachEvent(sock)) {
+                        peer_sock->emitErr(SockException(
+                            ErrorCode::Eof,
+                            "add event to poller failed when accept a socket"
+                        ));
+                    }
+                } catch (std::exception& ex) {
+                    ErrorL << "Exception occurred: " << ex.what();
+                }
             });
+
+            try {
+                // 捕获异常，防止socket未accept尽，epoll边沿触发失效的问题
+                std::lock_guard<decltype(mtx_event_)> lock(mtx_event_);
+                on_accept_(peer_sock, completed);  // 连接回调, 创建连接的session，设置回调
+            } catch (std::exception& ex) {
+                ErrorL << "Exception occured when emit on_accept: " << ex.what();
+                continue;
+            }
+        }
+
+        if (!(event & EventPoller::Poll_Event::Error_Event)) {
+            auto ex = getSockErr(sock->rawFd());
+            emitErr(ex);
+            ErrorL << "TCP listener occurred a err: " << ex.what();
             return -1;
         }
-
-        SockUtil::setNoSigpipe(fd);
-        SockUtil::setNoBlocked(fd);
-        SockUtil::setNoDelay(fd);
-        SockUtil::setSendBuf(fd);
-        SockUtil::setRecvBuf(fd);
-        SockUtil::setCloseWait(fd);
-        SockUtil::setCloExec(fd);
-
-        Socket::Ptr peer_sock;
-        try {
-            std::lock_guard<decltype(mtx_event_)> lock(mtx_event_);
-            peer_sock = on_before_accept_(poller_);
-        } catch (std::exception& ex) {
-            ErrorL << "Exception occurred when emit on_before_accept: " << ex.what();
-            close(fd);
-            continue;
-        }
-
-        if (!peer_sock) {
-            // 子Socket共用父Socket的poll线程并且关闭互斥锁
-            peer_sock = Socket::createSocket(poller_, false);
-        }
-
-        auto sock = std::make_shared<SockNum>(fd, SockNum::SockType::TCP);
-        peer_sock->setSock(sock);
-        memcpy(&peer_sock->peer_addr_, &peer_addr, addr_len);
-
-        std::shared_ptr<void> completed(nullptr, [peer_sock, sock](void*) {
-            try {
-                if (!peer_sock->attachEvent(sock)) {
-                    peer_sock->emitErr(SockException(
-                        ErrorCode::Eof,
-                        "add event to poller failed when accept a socket"
-                    ));
-                }
-            } catch (std::exception& ex) {
-                ErrorL << "Exception occurred: " << ex.what();
-            }
-        });
-
-        try {
-            // 捕获异常，防止socket未accept尽，epoll边沿触发失效的问题
-            std::lock_guard<decltype(mtx_event_)> lock(mtx_event_);
-            on_accept_(peer_sock, completed);
-        } catch (std::exception& ex) {
-            ErrorL << "Exception occured when emit on_accept: " << ex.what();
-            continue;
-        }
-    }
-
-    if (!(event & EventPoller::Poll_Event::Error_Event)) {
-        auto ex = getSockErr(sock->rawFd());
-        emitErr(ex);
-        ErrorL << "TCP listener occurred a err: " << ex.what();
-        return -1;
     }
 }
 
@@ -822,7 +860,7 @@ bool Socket::flushData(const SockNum::Ptr& sock, bool poller_thread) {
 
         int err = get_uv_error(true);
         if (err == UV_EAGAIN) {
-            // 等待下一次发送
+            // 等待下一次发送, 非阻塞时，发送缓冲区满返回EAGAIN
             if (!poller_thread) {
                 startWriteAbleEvent(sock);
             }
@@ -995,6 +1033,7 @@ bool SocketHelper::isSocketBusy() const {
 }
 
 void SocketHelper::setOnCreateSocket(Socket::onCreateSocket cb) {
+    InfoL << "enter SocketHelper::setOnCreateSocket";
     if (cb) {
         on_create_socket_ = std::move(cb);
     } else {
@@ -1002,6 +1041,7 @@ void SocketHelper::setOnCreateSocket(Socket::onCreateSocket cb) {
             return Socket::createSocket(poller, false);
         };
     }
+    InfoL << "leave SocketHelper::setOnCreateSocket";
 }
 
 Socket::Ptr SocketHelper::createSocket() { return on_create_socket_(poller_); }
@@ -1065,7 +1105,7 @@ void SocketHelper::setSock(const Socket::Ptr& sock) {
 }
 
 std::ostream& operator<<(std::ostream& os, const SockException& ex) {
-    os << ex.getErrCode() << "(" << ex.what() << ")";
+    // os << ex.getErrCode() << "(" << ex.what() << ")";
     return os;
 }
 

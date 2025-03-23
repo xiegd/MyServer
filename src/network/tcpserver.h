@@ -25,6 +25,7 @@ public:
     void start(uint16_t port, const std::string& host = "::", uint32_t backlog = 1024,
                const std::function<void(std::shared_ptr<SessionType>&)>& cb = nullptr) {
         static std::string cls_name = xkernel::demangle(typeid(SessionType).name());
+        // 设置会话创建器, 实现创建不同类型的服务器
         session_alloc_ = [cb] (const TcpServer::Ptr& server, const Socket::Ptr& sock) -> SessionHelper::Ptr {
             auto session = std::shared_ptr<SessionType>(
                 new SessionType(sock), [](SessionType* ptr) {
@@ -34,8 +35,10 @@ public:
             if (cb) {
                 cb(session);
             }
+            InfoL << session.get();
             TraceP(static_cast<Session*>(session.get())) << cls_name;
             session->setOnCreateSocket(server->on_create_socket_);
+            InfoL << "session->setOnCreateSocket(server->on_create_socket_)";
             return std::make_shared<SessionHelper>(server, std::move(session), cls_name);
         };
         start_l(port, host, backlog);
@@ -63,7 +66,7 @@ private:
     bool is_on_manager_ = false;
     bool main_server_ = true;
     std::weak_ptr<TcpServer> parent_;
-    Socket::Ptr socket_;
+    Socket::Ptr socket_;  // 服务器的监听socket
     std::shared_ptr<Timer> timer_;
     Socket::onCreateSocket on_create_socket_;
     std::unordered_map<SessionHelper*, SessionHelper::Ptr> session_map_;

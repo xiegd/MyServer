@@ -107,6 +107,9 @@ TaskExecutor::TaskExecutor(uint64_t max_size, uint64_t max_usec)
 
 //////////////////////// TaskExecutorGetterImpl /////////////////////////////////
 
+/*
+    brief: 获取负载最小的poller
+*/
 TaskExecutor::Ptr TaskExecutorGetterImpl::getExecutor() {
     auto thread_idx = thread_idx_;
     if (thread_idx >= threads_.size()) {
@@ -114,6 +117,8 @@ TaskExecutor::Ptr TaskExecutorGetterImpl::getExecutor() {
     }
     TaskExecutor::Ptr executor_min_load = threads_[thread_idx];
     auto min_load = executor_min_load->load();
+    // 每次从thread_idx开始遍历，避免每次从头开始遍历在负载相同时
+    // 总是选择第一个线程，导致分配不均，同时对cpu缓冲更友好
     for (size_t i = 0; i < threads_.size(); ++i) {
         ++thread_idx;
         if (thread_idx >= threads_.size()) {
@@ -164,6 +169,9 @@ void TaskExecutorGetterImpl::forEach(const std::function<void(const TaskExecutor
     }
 }
 
+/*
+    brief: 向EventPollerPool中添加指定数量的EventPoller实例
+*/
 size_t TaskExecutorGetterImpl::addPoller(const std::string& name, size_t size, 
     Thread_Priority priority, bool register_thread, bool enable_cpu_affinity) {
     auto cpus = std::thread::hardware_concurrency();

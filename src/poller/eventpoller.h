@@ -20,6 +20,9 @@ namespace xkernel {
 
 class PipeWrap;
 
+/*
+    brief: 事件轮询线程, 对应一个EventPoller实例
+*/
 class EventPoller : public TaskExecutor, 
                     public AnyStorage,
                     public std::enable_shared_from_this<EventPoller> {
@@ -60,7 +63,7 @@ public:
 private:
     EventPoller(std::string name);
 
-    void runLoop(bool blocked, bool ref_self);  // 执行事件轮询
+    void runLoop(bool blocked, bool ref_self);  // 事件循环核心
     void shutdown();
     void onPipeEvent(bool flush = false);  // 内部管道事件，用于唤醒轮询线程
     Task::Ptr async_l(TaskIn task, bool may_sync = true, bool first = false);
@@ -78,10 +81,10 @@ private:
     semaphore sem_run_started_;
     std::unique_ptr<PipeWrap> pipe_;
     std::mutex mtx_task_;
-    List<Task::Ptr> list_task_;  // 任务队列
+    List<Task::Ptr> list_task_;  // 任务队列, 使用async() or asyncFirst() 添加, 通过pipe_的读端唤醒
     Logger::Ptr logger_;
     int event_fd_ = -1;  // epoll实例的fd
-    std::unordered_map<int, std::shared_ptr<PollEventCb>> event_map_;  // 事件回调映射, fd, cb
+    std::unordered_map<int, std::shared_ptr<PollEventCb>> event_map_;  // fd到回调函数的映射, fd, cb
     std::unordered_set<int> event_cache_expired_;  // 已过期事件的缓存
     std::multimap<uint64_t, DelayTask::Ptr> delay_task_map_;  // 定时任务映射 
 };
@@ -106,6 +109,9 @@ constexpr bool operator!(EventPoller::Poll_Event event) {
     return static_cast<std::underlying_type_t<EventPoller::Poll_Event>>(event) != 0;
 }
 
+/*
+    brief: 事件轮询线程池, 每个线程对应一个EventPoller实例
+*/
 class EventPollerPool : public std::enable_shared_from_this<EventPollerPool>,
                         public TaskExecutorGetterImpl {
 public:

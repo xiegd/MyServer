@@ -86,7 +86,7 @@ int SockUtil::connect(const char* host, uint16_t port, bool async,
 int SockUtil::listen(const uint16_t port, const char* local_ip, int back_log) {
     int fd = -1;
     int family = supportIpv6() ? (isIpv4(local_ip) ? AF_INET : AF_INET6) : AF_INET;
-    if (fd = static_cast<int>(socket(family, SOCK_STREAM, IPPROTO_TCP)) == -1) {
+    if ((fd = static_cast<int>(socket(family, SOCK_STREAM, IPPROTO_TCP))) == -1) {
         WarnL << "Create socket failed: " << get_uv_errmsg(true);
         return -1;
     }
@@ -168,7 +168,7 @@ bool SockUtil::getDomainIP(const char* host, uint16_t port,
     return flag;
 }
 
-// -------------------------------configure socket----------------------------------
+///////////////////////////////// configure socket /////////////////////////////////
 
 // 配置tcp的nodelay特性
 int SockUtil::setNoDelay(int fd, bool on) {
@@ -472,7 +472,7 @@ std::string SockUtil::inetNtoa(const struct sockaddr* addr) {
                 memcpy(&addr4, 12 + (char*)&reinterpret_cast<const struct sockaddr_in6*>(addr)->sin6_addr, 4);
                 return inetNtoa(addr4);
             }
-            return inetNtoa(reinterpret_cast<const struct in6_addr&>(addr));
+            return inetNtoa(reinterpret_cast<const struct sockaddr_in6*>(addr)->sin6_addr);
         }
         default:
             assert(0);
@@ -618,7 +618,7 @@ using getsockname_type = decltype(getsockname);
 // 根据传入的func, fd获取相应的地址信息存到sockaddr_storage中
 static bool get_socket_addr(int fd, struct sockaddr_storage& addr, getsockname_type func) {
     socklen_t addr_len = sizeof addr;
-    if (-1 == func(fd, reinterpret_cast<sockaddr*>(&addr), &addr_len)) {
+    if (-1 == func(fd, reinterpret_cast<struct sockaddr*>(&addr), &addr_len)) {
         WarnL << "get socket addr failed: " << get_uv_errmsg();
         return false;
     }

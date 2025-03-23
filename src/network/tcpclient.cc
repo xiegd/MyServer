@@ -45,16 +45,19 @@ void TcpClient::startConnect(const std::string& url, uint16_t port,
     });
 
     TraceL << getIdentifier() << " start connect " << url << ":" << port;
+
     sock_ptr->connect(url, port, [weak_self](const SockException& err) {
         auto strong_self = weak_self.lock();
+        // TraceL << "con_cb_in";
         if (strong_self) {
             strong_self->onSockConnect(err);
         }
     }, timeout_sec, net_adapter_, local_port);
+    // TraceL << "after start connect";
 }
 
 void TcpClient::onSockConnect(const SockException& ex) {
-    TraceL << getIdentifier() << " connect result: " << ex;
+    TraceL << getIdentifier() << " connect result: " << ex;  //// 
     if (ex) {
         timer_.reset();
         onConnect(ex);

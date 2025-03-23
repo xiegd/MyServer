@@ -47,17 +47,24 @@ EventPoller::~EventPoller() {
         close(event_fd_);
         event_fd_ = -1;
     }
+    InfoL << "Enter onPipeEvent";
     onPipeEvent(true);  // 退出前清理管道中的数据
     InfoL << getThreadName();
 }
 
+/*
+    brief: 添加事件
+    fd: 监听的fd
+    event: 监听的事件类型
+    cb: 对应事件发生时的回调函数
+*/
 int EventPoller::addEvent(int fd, Poll_Event event, PollEventCb cb) {
     TimeTicker();  // 计时宏，用来统计代码执行时间
     if (!cb) {
         WarnL << "PollEventCB is empty";
         return -1;
     }
-    // 如果当前线程就是事件轮询器线程，则直接操作epoll实例
+    // 如果当前线程就是事件循环线程，则直接操作epoll实例
     if (isCurrentThread()) {
         struct epoll_event ev = {0};
         ev.events = toEpoll(event);
@@ -86,6 +93,7 @@ int EventPoller::delEvent(int fd, PollCompleteCb cb) {
             event_cache_expired_.emplace(fd);
             ret = epoll_ctl(event_fd_, EPOLL_CTL_DEL, fd, nullptr);
         }
+        DebugL << "delEvent";
         cb(ret != -1);
         return ret;
     }
@@ -176,6 +184,9 @@ std::thread::id EventPoller::getThreadId() const {
 
 const std::string& EventPoller::getThreadName() const { return name_; }
 
+/*
+    brief: 构造函数, addPoller()方法中调用创建EventPollerPool中的EventPoller实例
+*/
 EventPoller::EventPoller(std::string name) {
     event_fd_ = create_event();
     if (event_fd_ == -1) {
@@ -188,49 +199,72 @@ EventPoller::EventPoller(std::string name) {
     addEventPipe();
 }
 
+/*
+    brief: 事件循环核心
+    param:
+        blocked: 是否阻塞
+        ref_self: 是否引用当前实例
+*/
 void EventPoller::runLoop(bool blocked, bool ref_self) {
     if (blocked) {
         if (ref_self) {
             s_current_poller = shared_from_this();
         }
-        sem_run_started_.post();
+        sem_run_started_.post();  // 通知主线程，事件循环线程已启动
         exit_flag_ = false;
         uint64_t minDelay;
+
+        uint64_t last_time = TimeUtil::getCurrentMillisecond();
         
         struct epoll_event events[EPOLL_SIZE];
+        // 事件循环
         while (!exit_flag_) {
-            minDelay = getMinDelay();
-            startSleep();
+            minDelay = getMinDelay();  // 执行delay task，返回最近延时
+            startSleep();  // 统计上一段执行任务的时间 
+            // 使用epoll_wait等待事件发生，超时时间由minDelay决定, 
+            // 如果minDelay为0，则不设置超时时间，一直等待事件发生
+            // epoll_wait返回值为发生的事件数量, 并将发生的事件写入events数组中
             int ret = epoll_wait(event_fd_, events, EPOLL_SIZE, minDelay ? minDelay : -1);
-            sleepWakeUp();
+            sleepWakeUp(); // 统计sleep时间 
             if (ret <= 0) {
                 continue;  // 超时或被打断
             }
 
+            if (TimeUtil::getCurrentMillisecond() - last_time > 2000) {
+                DebugL << "list_task_ size: " << list_task_.size();
+                DebugL << "event_map_ size: " << event_map_.size();
+                DebugL << "event_cache_expired_ size: " << event_cache_expired_.size(); 
+                DebugL << "BufferRaw::counter_ size: " << ObjectCounter<BufferRaw>::count();  // 
+                last_time = TimeUtil::getCurrentMillisecond();
+            }
+
             event_cache_expired_.clear();
+            // 处理就绪事件
             for (int i = 0; i < ret; ++i) {
                 struct epoll_event& ev = events[i];
                 int fd = ev.data.fd;
                 if (event_cache_expired_.count(fd)) {
                     continue;  // 事件缓存刷新
                 }
-
+                // 查找事件映射表, 找不到就将fd从epoll中删除
                 auto it = event_map_.find(fd);
                 if (it == event_map_.end()) {
                     epoll_ctl(event_fd_, EPOLL_CTL_DEL, fd, nullptr);
                     continue;
                 }
+                // 找到了，执行事件回调
                 auto cb = it->second;
                 try {
-                    (*cb)(toPoller(ev.events));
+                    (*cb)(toPoller(ev.events));  // 执行事件回调
                 } catch (std::exception& ex) {
                     ErrorL << "Exception occurred when do event task: " << ex.what();
                 }
             }
         }
     } else {
+        // 创建新线程执行事件循环
         loop_thread_ = new std::thread(&EventPoller::runLoop, this, true, ref_self);
-        sem_run_started_.wait();
+        sem_run_started_.wait();  // 等待事件循环线程启动
     }
 }
 
@@ -257,6 +291,7 @@ inline void EventPoller::onPipeEvent(bool flush) {
             }
             if (err == 0 || get_uv_error(true) != UV_EAGAIN) {
                 ErrorL << "Invalid pipe fd of event poller, reopen it";
+                // 管道出错，删除管道事件，重新打开管道，添加管道事件
                 delEvent(pipe_->readFD());
                 pipe_->reOpen();
                 addEventPipe();
@@ -323,6 +358,7 @@ uint64_t EventPoller::getMinDelay() {
 void EventPoller::addEventPipe() {
     SockUtil::setNoBlocked(pipe_->readFD());
     SockUtil::setNoBlocked(pipe_->writeFD());
+    // 添加内部管道事件, 当管道有数据时，触发onPipeEvent()方法， 执行list_task_中的所有任务
     if (addEvent(pipe_->readFD(), Poll_Event::Read_Event, 
                 [this](Poll_Event event) { onPipeEvent(false); }) == -1) {
         throw std::runtime_error("Add pipe fd to poller failed");
