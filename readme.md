@@ -23,7 +23,7 @@ src/
 │   ├── socket.cc       # Socket封装
 │   ├── buffer.cc       # 缓冲区实现
 │   ├── sockutil.cc     # Socket工具类
-│   └──buffersock.cc   # 封装Socket的发送和接收针对tcp和udp单独设计
+│   └── buffersock.cc   # 封装Socket的发送和接收针对tcp和udp单独设计
 ├── poller/      # 事件轮询器
 ├── thread/      # 线程相关实现
 └── util/        # 工具类
