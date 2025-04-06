@@ -3,6 +3,7 @@
 /ZLToolKit/bin
 /ZLToolKit/CMakeFiles
 /ZLToolKit/lib
+/ZLToolKit/tests
 /test/build
 /test/unittest/build
 /src/main.cc
@@ -10,4 +11,8 @@
 /sources
 /workflow
 /bin
-/test/test/build
+/test/test
+/test/_deps
+/ZLMediaKit
+/.cache
+/test/CMakeFiles

@@ -359,8 +359,8 @@ bool Socket::attachEvent(const SockNum::Ptr& sock) {
         return -1 != result;
     }
 
-    // tcp client / udp
-    auto read_buffer = poller_->getSharedBuffer(sock->type() == SockNum::SockType::UDP);
+    // 其他类型的连接
+    auto read_buffer = poller_->getSharedBuffer(sock->type() == SockNum::SockType::UDP);  // 获取共享的缓冲区
     auto result = poller_->addEvent(
         sock->rawFd(),
         EventPoller::Poll_Event::Read_Event | EventPoller::Poll_Event::Write_Event | EventPoller::Poll_Event::Error_Event,
@@ -387,7 +387,8 @@ bool Socket::attachEvent(const SockNum::Ptr& sock) {
 }
 
 ssize_t Socket::onRead(const SockNum::Ptr& sock, const SocketRecvBuffer::Ptr& buffer) noexcept {
-    ssize_t ret = 0, nread = 0, count = 0;
+    ssize_t ret = 0, nread = 0, count = 0;  // count指示是否接收了数据, nread指示接收到的数据长度
+    InfoL << "onRead() callback";
     while (enable_recv_) {
         nread = buffer->recvFromSocket(sock->rawFd(), count);
         if (nread == 0) {
@@ -418,11 +419,12 @@ ssize_t Socket::onRead(const SockNum::Ptr& sock, const SocketRecvBuffer::Ptr& bu
         auto& addr = buffer->getAddress(0);
         try {
             std::lock_guard<decltype(mtx_event_)> lock(mtx_event_);
-            on_multi_read_(&buf, &addr, count);
+            on_multi_read_(&buf, &addr, count);  // 调用server设置的on_multi_read_回调，进行后续的处理
         } catch (std::exception& ex) {
             ErrorL << "Exception occured when emit on_read: " << ex.what();
         }
     }
+    InfoL << "onRead() end";
     return 0;  // 没有开启enable_recv
 }
 
@@ -535,10 +537,12 @@ ssize_t Socket::send_l(Buffer::Ptr buf, bool is_buf_sock, bool try_flush) {
         return 0;
     }
     {
+        // 将待发送内容加入到二级发送缓冲
         std::lock_guard<decltype(mtx_send_buf_waiting_)> lock(mtx_send_buf_waiting_);
         send_buf_waiting_.emplace_back(std::move(buf), is_buf_sock);
     }
     if (try_flush) {
+        // 刷新缓冲区尝试发送数据
         if (flushAll()) {
             return -1;
         }
@@ -745,8 +749,9 @@ int Socket::onAccept(const SockNum::Ptr& sock, EventPoller::Poll_Event event) no
 
             auto sock = std::make_shared<SockNum>(fd, SockNum::SockType::TCP);  // 创建sock封装fd
             peer_sock->setSock(sock);  // 将fd关联到Socket实例
-            memcpy(&peer_sock->peer_addr_, &peer_addr, addr_len);
+            memcpy(&peer_sock->peer_addr_, &peer_addr, addr_len);  // 设置对方的地址
 
+            // shared_ptr<void>， 内容为nullptr带deleter的shared_ptr, 确保在异步操作完成后自动触发事件注册
             std::shared_ptr<void> completed(nullptr, [peer_sock, sock](void*) {
                 try {
                     if (!peer_sock->attachEvent(sock)) {
@@ -763,7 +768,7 @@ int Socket::onAccept(const SockNum::Ptr& sock, EventPoller::Poll_Event event) no
             try {
                 // 捕获异常，防止socket未accept尽，epoll边沿触发失效的问题
                 std::lock_guard<decltype(mtx_event_)> lock(mtx_event_);
-                on_accept_(peer_sock, completed);  // 连接回调, 创建连接的session，设置回调
+                on_accept_(peer_sock, completed);  // 连接回调, 创建连接的session，设置回调, 传递completed保证异步操作完成后自动触发事件注册
             } catch (std::exception& ex) {
                 ErrorL << "Exception occured when emit on_accept: " << ex.what();
                 continue;
@@ -799,16 +804,20 @@ void Socket::onWriteAble(const SockNum::Ptr& sock) {
     }
 }
 
+/*
+    brief: 刷新缓冲区尝试发送数据
+*/
 bool Socket::flushData(const SockNum::Ptr& sock, bool poller_thread) {
     decltype(send_buf_sending_) send_buf_sending_tmp;
     {
+        // 取出一级发送缓存的内容
         std::lock_guard<decltype(mtx_send_buf_sending_)> lock(mtx_send_buf_sending_);
         if (!send_buf_sending_.empty()) {
             send_buf_sending_tmp.swap(send_buf_sending_);
         }
     }
 
-    // 二级发送缓存为空，则消费一级发送缓存数据
+    // 一级发送缓存为空，则将二级发送缓存的内容加入到一级发送缓存
     if (send_buf_sending_tmp.empty()) {
         send_flush_ticker_.resetTime();
         do {
@@ -825,6 +834,8 @@ bool Socket::flushData(const SockNum::Ptr& sock, bool poller_thread) {
                             send_result_(buffer, send_success);
                         }
                     } : send_result_;
+                    // 将二级发送缓存的内容加入到一级发送缓存
+                    // 将二级发送缓冲中的待发送的缓冲区封装到BufferList然后加入到一级发送缓冲
                     send_buf_sending_tmp.emplace_back(BufferList::create(
                         std::move(send_buf_waiting_), std::move(send_result),
                         sock->type() == SockNum::SockType::UDP
@@ -842,9 +853,11 @@ bool Socket::flushData(const SockNum::Ptr& sock, bool poller_thread) {
         } while (false);
     }
 
+    // 一级发送缓存不为空，则循环的从一级发送缓冲区中取出BufferList进行批量发送Buffer
     while (!send_buf_sending_tmp.empty()) {
         auto& packet = send_buf_sending_tmp.front();
         auto n = packet->send(sock->rawFd(), sock_flags_);
+        InfoL << "send data size: " << n;
         if (n > 0) {
             // 全部发送成功
             if (packet->empty()) {
@@ -878,7 +891,7 @@ bool Socket::flushData(const SockNum::Ptr& sock, bool poller_thread) {
         return false;
     }
 
-    // 数据未发送完
+    // 数据未发送完的部分，放回到一级发送缓存
     if (!send_buf_sending_tmp.empty()) {
         std::lock_guard<decltype(mtx_send_buf_sending_)> lock(mtx_send_buf_sending_);
         send_buf_sending_tmp.swap(send_buf_sending_);
@@ -1033,7 +1046,6 @@ bool SocketHelper::isSocketBusy() const {
 }
 
 void SocketHelper::setOnCreateSocket(Socket::onCreateSocket cb) {
-    InfoL << "enter SocketHelper::setOnCreateSocket";
     if (cb) {
         on_create_socket_ = std::move(cb);
     } else {
@@ -1041,7 +1053,6 @@ void SocketHelper::setOnCreateSocket(Socket::onCreateSocket cb) {
             return Socket::createSocket(poller, false);
         };
     }
-    InfoL << "leave SocketHelper::setOnCreateSocket";
 }
 
 Socket::Ptr SocketHelper::createSocket() { return on_create_socket_(poller_); }

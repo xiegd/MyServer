@@ -57,7 +57,7 @@ class SocketRecvBuffer {
 public:
     using Ptr = std::shared_ptr<SocketRecvBuffer>;
 
-    static Ptr create(bool is_udp);
+    static Ptr create(bool is_udp);  // 静态方法，用于创建SocketRecvBuffer对象
     SocketRecvBuffer() = default;
     virtual ~SocketRecvBuffer() = default;
 
@@ -72,7 +72,7 @@ class BufferList : public Noncopyable {
 public:
     using Ptr = std::shared_ptr<BufferList>;
     using SendResult = std::function<void(const Buffer::Ptr& buffer, bool send_success)>;
-
+    // 静态方法，工厂方法根据is_udp参数创建不同的BufferList对象
     static Ptr create(List<std::pair<Buffer::Ptr, bool>> list, SendResult cb, bool is_udp);
     BufferList() = default;
     virtual ~BufferList() =  default;
@@ -97,11 +97,12 @@ public:
 
 protected:
     BufferList::SendResult cb_;
-    List<std::pair<Buffer::Ptr, bool>> pkt_list_;
+    List<std::pair<Buffer::Ptr, bool>> pkt_list_;  // 将二级发送缓冲区的内容进行所有权转移到pkt_list_
 };
 
 using SocketBuf = iovec;
 
+// tcp对应的发送封装
 class BufferSendMsg final : public BufferList,
                             public BufferCallBack {
 public:
@@ -141,6 +142,7 @@ private:
     size_t offset_ = 0;
 };
 
+// udp对应的发送封装
 class BufferSendMMsg : public BufferList,
                        public BufferCallBack {
 public:

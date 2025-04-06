@@ -10,7 +10,20 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # 设置编译类型为调试模式
 set(CMAKE_BUILD_TYPE Debug)
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g")
+# -g: 生成调试信息;
+# -O0: 关闭所有优化，确保编译器不对代码进行优化, 确保调试时代码的行为和源代码一致;
+# -fsanitize=address: 启用地址错误检测, 帮助检查内存泄漏，越界访问，未初始化内存使用;
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -O0 -fsanitize=address")
+
+# 在 CMakeLists.txt 的开头添加
+if (CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+    # 添加 ASan 编译选项
+    add_compile_options(-fsanitize=address)
+    # 添加 ASan 链接选项（某些系统需要）
+    add_link_options(-fsanitize=address)
+    # 启用调试符号
+    add_compile_options(-g)
+endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)  # 在build目录下生成compile_commands.json文件
 
@@ -53,18 +66,19 @@ file(GLOB NETWORK_HEAD ${SOURCE_DIR}/network/*.h)
 
 message(STATUS "UTIL_SRCS: ${UTIL_SRCS}")
 
-add_executable(delaytask_test ${UNITTEST_FILEPATH}/../test/delaytask_test.cc 
+add_executable(tcp_echoserver_test ${UNITTEST_FILEPATH}/../test/tcp_echoserver_test.cc 
               ${UTIL_SRCS}
               ${POLLE_SRCS}
               ${THREAD_SRCS}
               ${NETWORK_SRCS}
               )
 
-target_include_directories(delaytask_test 
-  PRIVATE
-    ${INCLUDE_DIRS}
+target_include_directories(tcp_echoserver_test 
+PRIVATE
+  ${INCLUDE_DIRS}
 )
 
-target_link_libraries(delaytask_test gtest_main OpenSSL::Crypto OpenSSL::SSL)
+target_link_libraries(tcp_echoserver_test gtest_main OpenSSL::Crypto OpenSSL::SSL)
 
-set_target_properties(delaytask_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_DIR}) 
+set_target_properties(tcp_echoserver_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_DIR}) 
+

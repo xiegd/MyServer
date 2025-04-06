@@ -619,7 +619,6 @@ using getsockname_type = decltype(getsockname);
 static bool get_socket_addr(int fd, struct sockaddr_storage& addr, getsockname_type func) {
     socklen_t addr_len = sizeof addr;
     if (-1 == func(fd, reinterpret_cast<struct sockaddr*>(&addr), &addr_len)) {
-        WarnL << "get socket addr failed: " << get_uv_errmsg();
         return false;
     }
     return true;

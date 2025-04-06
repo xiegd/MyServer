@@ -213,12 +213,6 @@ public:
     uint16_t getPeerPort() override;
     std::string getIdentifier() const override;  // 获取socket对象的内存地址
 
-    // 测试Debug内存异常问题
-    void getBufferSize() {
-        DebugL << "buffer size: " << this->send_buf_waiting_.size();
-        DebugL << "buffer size: " << this->send_buf_sending_.size();
-    }
-
 private:
     Socket(EventPoller::Ptr poller, bool enable_mutex = true);
     void setSock(SockNum::Ptr sock);  // 设置sock_fd_和local_addr_、peer_addr_
@@ -261,10 +255,10 @@ private:
     onCreateSocket on_before_accept_;                       // tcp监听收到accept请求，自定义创建peer
     MutexWrapper<std::recursive_mutex> mtx_event_;          // 设置自定义回调的锁
 
-    List<std::pair<Buffer::Ptr, bool>> send_buf_waiting_;   // 一级发送缓存, socket可写时会把一级缓存批量送入二级缓存
-    MutexWrapper<std::recursive_mutex> mtx_send_buf_waiting_;  // 一级发送缓存锁
-    List<BufferList::Ptr> send_buf_sending_;                   // 二级发送缓存, socket可写时会把二级缓存批量写入socket
-    MutexWrapper<std::recursive_mutex> mtx_send_buf_sending_;  // 二级发送缓存锁
+    List<std::pair<Buffer::Ptr, bool>> send_buf_waiting_;   // 二级发送缓存, 使用SocketHelper::send()添加待发送数据到二级缓存
+    MutexWrapper<std::recursive_mutex> mtx_send_buf_waiting_;  // 二级发送缓存锁
+    List<BufferList::Ptr> send_buf_sending_;                   // 一级发送缓存, socket可写时会把二级缓存批量写入socket
+    MutexWrapper<std::recursive_mutex> mtx_send_buf_sending_;  // 一级发送缓存锁
     BufferList::SendResult send_result_;                        // 发送buffer结果回调
     ObjectCounter<Socket> statistic_;                           // 对象个数统计
     // 缓存地址，防止tcp reset 导致无法获取对端的地址
@@ -327,11 +321,6 @@ public:
     ssize_t send(Buffer::Ptr buf) override;
     void shutdown(const SockException& ex = SockException(ErrorCode::Shutdown, "self shutdown")) override;
     void safeShutdown(const SockException& ex = SockException(ErrorCode::Shutdown, "self shutdown"));
-
-    // 调试内存异常问题
-    void getBufferSize() {
-        this->sock_->getBufferSize();
-    }
 
     virtual void onRecv(const Buffer::Ptr& buf) = 0;
     virtual void onErr(const SockException& err) = 0;

@@ -169,6 +169,11 @@ static thread_local std::weak_ptr<EventPoller> s_current_poller;
 
 EventPoller::Ptr EventPoller::getCurrentPoller() { return s_current_poller.lock(); }
 
+/*
+    brief: 获取共享的读缓冲区, 如果当前线程没有共享的读缓冲区，则创建
+    这里使用了工厂方法模式，根据tcp or udp创建不同的SocketRecvBuffer对象
+    对应使用recvfrom() or recvmmsg()
+*/
 SocketRecvBuffer::Ptr EventPoller::getSharedBuffer(bool is_udp) {
     auto ret = shared_buffer_[is_udp].lock();
     if (!ret) {
@@ -230,13 +235,15 @@ void EventPoller::runLoop(bool blocked, bool ref_self) {
                 continue;  // 超时或被打断
             }
 
-            if (TimeUtil::getCurrentMillisecond() - last_time > 2000) {
-                DebugL << "list_task_ size: " << list_task_.size();
-                DebugL << "event_map_ size: " << event_map_.size();
-                DebugL << "event_cache_expired_ size: " << event_cache_expired_.size(); 
-                DebugL << "BufferRaw::counter_ size: " << ObjectCounter<BufferRaw>::count();  // 
-                last_time = TimeUtil::getCurrentMillisecond();
-            }
+            // if (TimeUtil::getCurrentMillisecond() - last_time > 2000) {
+            //     InfoL << "--------------------------------";
+            //     DebugL << "list_task_ size: " << list_task_.size();
+            //     DebugL << "event_map_ size: " << event_map_.size();
+            //     DebugL << "event_cache_expired_ size: " << event_cache_expired_.size(); 
+            //     DebugL << "BufferRaw::counter_ size: " << ObjectCounter<BufferRaw>::count();  // 
+            //     InfoL << "--------------------------------";
+            //     last_time = TimeUtil::getCurrentMillisecond();
+            // }
 
             event_cache_expired_.clear();
             // 处理就绪事件

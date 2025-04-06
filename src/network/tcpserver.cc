@@ -81,13 +81,14 @@ Session::Ptr TcpServer::onAcceptConnection(const Socket::Ptr& sock) {
     assert(success);
 
     std::weak_ptr<Session> weak_session = session;
+    // 设置socket::on_multi_read_
     sock->setOnRead([weak_session](const Buffer::Ptr& buf, struct sockaddr*, int) {
         auto strong_session = weak_session.lock();
         if (!strong_session) {
             return ;
         }
         try {
-            strong_session->onRecv(buf);
+            strong_session->onRecv(buf);  // 建立了tcp连接后，如果发生可读事件则会调用
         } catch (SockException& ex) {
             strong_session->shutdown(ex);
         } catch (std::exception& ex) {

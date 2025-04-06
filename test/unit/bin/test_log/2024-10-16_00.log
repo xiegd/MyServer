@@ -1,2 +1,0 @@
-2024-10-16 12:43:10.459 I FileChannel [logger_test] [404173-logger_test] logger_test.cc:133 TestBody | This is a file log test
-2024-10-16 14:02:45.062 I [logger_test] [418902-logger_test] logger_test.cc:133 TestBody | This is a file log test

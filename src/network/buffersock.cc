@@ -38,6 +38,9 @@ size_t BufferSock::getCapacity() const { return buffer_->getCapacity(); }
 static constexpr auto kPacketCount = 32;
 static constexpr auto kBufferCapacity = 4 * 1024u;
 
+/*
+    brief: 工厂方法，根据tcp or udp创建不同的SocketRecvBuffer对象
+*/
 SocketRecvBuffer::Ptr SocketRecvBuffer::create(bool is_udp) {
     if (is_udp) {
         return std::make_shared<SocketRecvmmsgBuffer>(kPacketCount, kBufferCapacity);
@@ -85,9 +88,9 @@ BufferSendMsg::BufferSendMsg(List<std::pair<Buffer::Ptr, bool>> list, SendResult
     : BufferCallBack(std::move(list), std::move(cb)), iovec_(pkt_list_.size()){
         auto it = iovec_.begin();
         pkt_list_.forEach([&](std::pair<Buffer::Ptr, bool>& pr) {
-            it->iov_base = pr.first->data();
-            it->iov_len = pr.first->size();
-            remain_size_ += it->iov_len;
+            it->iov_base = pr.first->data();  // 获取char*类型的缓冲区数据
+            it->iov_len = pr.first->size();  // 获取缓冲区数据的长度
+            remain_size_ += it->iov_len;  // 统计所有缓冲区数据的总长度
             ++it;
         });
 }
@@ -95,17 +98,26 @@ BufferSendMsg::BufferSendMsg(List<std::pair<Buffer::Ptr, bool>> list, SendResult
 bool BufferSendMsg::empty() { return remain_size_ == 0; }
 size_t BufferSendMsg::count() { return iovec_.size() - iovec_off_; }
 
+/*
+    brief: 发送数据(tcp)
+*/
 ssize_t BufferSendMsg::send(int fd, int flags) {
     auto remain_size = remain_size_;
-    while (remain_size && send_l(fd, flags) != -1)
+    while (remain_size_ && send_l(fd, flags) != -1) {
         ;
+    }
     ssize_t sent = remain_size - remain_size_;
+    InfoL << "BufferSendMsg::send sent: " << sent << "bytes";
     if (sent > 0) {
         return sent;
     }
     return -1;
 }
 
+/*
+    brief: 实际进行发送数据(tcp)
+    使用sendmsg系统调用一次发送多个缓冲区
+*/
 ssize_t BufferSendMsg::send_l(int fd, int flags) {
     ssize_t n;
     do {
@@ -367,6 +379,7 @@ ssize_t SocketRecvFromBuffer::recvFromSocket(int fd, ssize_t& count) {
         buffer_->data()[nread] = '\0';
         std::static_pointer_cast<BufferRaw>(buffer_)->setSize(nread);
     }
+    InfoL << "recvFromSocket: " << nread << "bytes";
     return nread;
 }
 

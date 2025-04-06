@@ -69,7 +69,7 @@ private:
     Socket::Ptr socket_;  // 服务器的监听socket
     std::shared_ptr<Timer> timer_;
     Socket::onCreateSocket on_create_socket_;
-    std::unordered_map<SessionHelper*, SessionHelper::Ptr> session_map_;
+    std::unordered_map<SessionHelper*, SessionHelper::Ptr> session_map_;  // 当前的所有连接对应的session
     std::function<SessionHelper::Ptr(const TcpServer::Ptr&, const Socket::Ptr&)> session_alloc_;
     std::unordered_map<const EventPoller*, Ptr> cloned_server_;
     ObjectCounter<TcpServer> counter_;

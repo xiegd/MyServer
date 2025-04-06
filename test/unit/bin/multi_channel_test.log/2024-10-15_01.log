@@ -1,4 +1,0 @@
-2024-10-15 23:06:32.959 E [logger_test] [92865-async log] logger.cc:516 changeFile | Failed to open log file: multi_channel_test.log/2024-10-15_00.log
-2024-10-15 23:06:32.960 I [logger_test] [92865-logger_test] logger.cc:49 ~Logger | 
-2024-10-15 23:09:51.828 I [logger_test] [94711-logger_test] logger_test.cc:178 TestBody | This should appear in both console and file
-2024-10-15 23:09:51.828 I [logger_test] [94711-logger_test] logger.cc:49 ~Logger | 
